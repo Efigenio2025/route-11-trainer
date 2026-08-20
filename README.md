@@ -2,6 +2,11 @@
 
 A mobile-first personal bus-route training PWA. Route 11 is loaded from the original driver route sheet, with separate westbound and eastbound instructions.
 
+## Open on your phone
+
+- GitHub Pages: https://efigenio2025.github.io/route-11-trainer/
+- Live app: https://route-11-trainer.joshuaefigenio.chatgpt.site/
+
 ## Run locally
 
 1. Install Node.js 22 or newer.
@@ -24,4 +29,3 @@ For a production check, run `npm run build`.
 ## Live GPS and maps
 
 Live Assist now has twelve westbound GPS checkpoints, a Mapbox road-following route, live high-accuracy phone location, distance reporting, and basic on/off-route detection. Simulation remains available for safe desk testing. Real on-device ride-along tests are still required to tune turn thresholds and verify the final transit-center approach. The local Mapbox token lives in `.env.local`; copy `.env.example` when setting up another device.
-
