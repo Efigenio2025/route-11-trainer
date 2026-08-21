@@ -4,7 +4,7 @@ import path from "node:path";
 const routeNumber = process.argv[2] || "30";
 const feedDir = path.resolve("gtfs-official");
 const output = path.resolve(`app/route${routeNumber}-official.ts`);
-const directionNames = routeNumber === "11" || routeNumber === "4" ? ["WEST", "EAST"] : ["NORTH", "SOUTH"];
+const directionNames = routeNumber === "26" ? ["LOOP"] : routeNumber === "11" || routeNumber === "4" ? ["WEST", "EAST"] : ["NORTH", "SOUTH"];
 
 function parseCsv(text) {
   const rows = [];
@@ -55,14 +55,11 @@ function directionData(directionId) {
   return { coordinates, stops: routeStops, shapeId, tripId: trip.trip_id };
 }
 
-const first = directionData("0");
-const second = directionData("1");
+const directionIds = [...new Set(activeTrips.map(t => t.direction_id))].sort();
+const directionResults = directionIds.slice(0, directionNames.length).map((id, index) => ({name: directionNames[index], data: directionData(id)}));
 const source = `// Generated from Omaha Metro's official GTFS feed by scripts/import-route30-gtfs.mjs ${routeNumber}.\n` +
   `export type OfficialRoutePoint = { name: string; coordinates: [number, number] };\n\n` +
-  `export const ROUTE${routeNumber}_${directionNames[0]}_SHAPE: [number, number][] = ${JSON.stringify(first.coordinates)};\n\n` +
-  `export const ROUTE${routeNumber}_${directionNames[1]}_SHAPE: [number, number][] = ${JSON.stringify(second.coordinates)};\n\n` +
-  `export const ROUTE${routeNumber}_${directionNames[0]}_STOPS: OfficialRoutePoint[] = ${JSON.stringify(first.stops)};\n\n` +
-  `export const ROUTE${routeNumber}_${directionNames[1]}_STOPS: OfficialRoutePoint[] = ${JSON.stringify(second.stops)};\n`;
+  directionResults.map(({name, data}) => `export const ROUTE${routeNumber}_${name}_SHAPE: [number, number][] = ${JSON.stringify(data.coordinates)};\n\nexport const ROUTE${routeNumber}_${name}_STOPS: OfficialRoutePoint[] = ${JSON.stringify(data.stops)};\n`).join("\n");
 fs.writeFileSync(output, source);
-console.log(JSON.stringify({ [directionNames[0].toLowerCase()]: { shapePoints: first.coordinates.length, stops: first.stops.length }, [directionNames[1].toLowerCase()]: { shapePoints: second.coordinates.length, stops: second.stops.length } }, null, 2));
+console.log(JSON.stringify(Object.fromEntries(directionResults.map(({name, data}) => [name.toLowerCase(), {shapePoints: data.coordinates.length, stops: data.stops.length}])), null, 2));
 
