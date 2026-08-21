@@ -140,12 +140,18 @@ async function mountLiveMap(host: HTMLElement) {
   const route36South = routeNumber === "36" && host.dataset.direction === "southbound";
   const route36Stops = route36South ? ROUTE36_SOUTH_STOPS : ROUTE36_NORTH_STOPS;
   const route36Shape = route36South ? ROUTE36_SOUTH_SHAPE : ROUTE36_NORTH_SHAPE;
+  const route15East = routeNumber === "15" && host.dataset.direction === "eastbound";
+  const route15Stops = route15East ? ROUTE15_EAST_STOPS : ROUTE15_WEST_STOPS;
+  const route15Shape = route15East ? ROUTE15_EAST_SHAPE : ROUTE15_WEST_SHAPE;
+  const route55East = routeNumber === "55" && host.dataset.direction === "eastbound";
+  const route55Stops = route55East ? ROUTE55_EAST_STOPS : ROUTE55_WEST_STOPS;
+  const route55Shape = route55East ? ROUTE55_EAST_SHAPE : ROUTE55_WEST_SHAPE;
   const maneuverCount = Number(host.dataset.maneuvers || 1);
-  const mapCoordinates = routeNumber === "30" ? route30Shape : routeNumber === "4" ? route4Shape : routeNumber === "35" ? route35Shape : routeNumber === "36" ? route36Shape : routeNumber === "26" ? ROUTE26_LOOP_SHAPE : route11Shape;
+  const mapCoordinates = routeNumber === "30" ? route30Shape : routeNumber === "4" ? route4Shape : routeNumber === "35" ? route35Shape : routeNumber === "36" ? route36Shape : routeNumber === "26" ? ROUTE26_LOOP_SHAPE : routeNumber === "15" ? route15Shape : routeNumber === "55" ? route55Shape : route11Shape;
   const checkpoints = routeNumber === "30" ? route30Turns.map(point => point.coordinates) : spacedCheckpoints(mapCoordinates, maneuverCount);
   const stops: MapPoint[] = routeNumber === "30"
     ? route30Stops
-    : routeNumber === "4" ? route4Stops : routeNumber === "35" ? route35Stops : routeNumber === "36" ? route36Stops : routeNumber === "26" ? ROUTE26_LOOP_STOPS : route11Stops;
+    : routeNumber === "4" ? route4Stops : routeNumber === "35" ? route35Stops : routeNumber === "36" ? route36Stops : routeNumber === "26" ? ROUTE26_LOOP_STOPS : routeNumber === "15" ? route15Stops : routeNumber === "55" ? route55Stops : route11Stops;
   const fallback = document.createElement("canvas");
   fallback.className = "route-canvas";
   fallback.setAttribute("aria-label", `Route ${routeNumber} path`);
@@ -309,4 +315,16 @@ import {
   ROUTE26_LOOP_SHAPE,
   ROUTE26_LOOP_STOPS,
 } from "./route26-official";
+import {
+  ROUTE15_EAST_SHAPE,
+  ROUTE15_EAST_STOPS,
+  ROUTE15_WEST_SHAPE,
+  ROUTE15_WEST_STOPS,
+} from "./route15-official";
+import {
+  ROUTE55_EAST_SHAPE,
+  ROUTE55_EAST_STOPS,
+  ROUTE55_WEST_SHAPE,
+  ROUTE55_WEST_STOPS,
+} from "./route55-official";
 
