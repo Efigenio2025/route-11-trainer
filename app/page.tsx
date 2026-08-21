@@ -60,51 +60,25 @@ const routes:Route[]=[
    {action:"continue",street:"40th Street",until:"Pratt Street"},
    {action:"continue",street:"Paxton Boulevard",until:"North Omaha Transit Center"}]},
   {id:"southbound",label:"Southbound",origin:"North Omaha T.C.",destination:"32nd & Vinton",steps:[
-   {action:"continue",street:"Paxton Boulevard",until:"40th Street"},
-   {action:"continue",street:"40th Street",until:"Lake Street"},
-   {action:"continue",street:"Lake Street",until:"33rd Avenue"},
-   {action:"continue",street:"33rd Street",until:"California Street"},
-   {action:"continue",street:"California and 30th Street",until:"Dodge Street"},
-   {action:"continue",street:"Park Avenue",until:"Ed Creighton Avenue"},
-   {action:"continue",street:"32nd Avenue",until:"Vinton Street"}]}
+   {action:"continue",street:"30th Street",until:"Sprague Street"},{action:"right",street:"Sprague Street",until:"J. Creighton Boulevard"},{action:"right",street:"J. Creighton Boulevard",until:"Paxton Boulevard"},{action:"right",street:"Paxton Boulevard",until:"38th Street",note:"Merge right onto Paxton."},{action:"left",street:"38th Street",until:"Pratt Street"},{action:"left",street:"Pratt Street",until:"40th Street"},{action:"right",street:"40th Street",until:"Lake Street"},{action:"left",street:"Lake Street",until:"33rd Avenue"},{action:"left",street:"33rd Avenue",until:"33rd Street"},{action:"right",street:"33rd Street",until:"California Street"},{action:"right",street:"California Street",until:"30th Street"},{action:"left",street:"30th Street / Turner Boulevard",until:"31st Street"},{action:"continue",street:"31st Street",until:"Leavenworth Street",note:"Stay left on 31st Street."},{action:"left",street:"Leavenworth Street",until:"Park Avenue"},{action:"right",street:"Park Avenue",until:"Ed Creighton Avenue"},{action:"right",street:"Ed Creighton Avenue",until:"32nd Avenue"},{action:"left",street:"32nd Avenue",until:"Vinton Street",note:"Start Route 36 interline."}]}
  ]},
  {id:"36",number:"36",name:"16th & Vinton Street",subtitle:"32nd & Vinton ↔ Downtown Omaha",directions:[
   {id:"northbound",label:"Northbound",origin:"32nd & Vinton",destination:"16th & Capitol",steps:[
-   {action:"continue",street:"Vinton Street",until:"16th Street"},
-   {action:"continue",street:"16th Street",until:"Jackson Street"},
-   {action:"continue",street:"16th Street",until:"Douglas Street"},
-   {action:"continue",street:"15th and Dodge Streets",until:"Capitol Avenue"}]},
+   {action:"right",street:"32nd Avenue",until:"Ed Creighton Avenue"},{action:"right",street:"Ed Creighton Avenue",until:"Park Avenue"},{action:"left",street:"Park Avenue",until:"Dodge Street"},{action:"left",street:"Dodge Street",until:"30th Street"},{action:"right",street:"30th Street",until:"California Street"},{action:"left",street:"California Street",until:"33rd Street"},{action:"right",street:"33rd Street",until:"Lake Street"},{action:"left",street:"Lake Street",until:"40th Street"},{action:"right",street:"40th Street",until:"Pratt Street"},{action:"right",street:"Pratt Street",until:"North 38th Street"},{action:"left",street:"North 38th Street",until:"Paxton Boulevard"},{action:"right",street:"Paxton Boulevard",until:"North 31st Street",note:"Regular mid-day route: merge onto North 31st."},{action:"left",street:"North 31st Street",until:"North Omaha T.C."},{action:"right",street:"North Omaha T.C. entrance",until:"layover"}]},
   {id:"southbound",label:"Southbound",origin:"16th & Capitol",destination:"32nd & Vinton",steps:[
-   {action:"continue",street:"Downtown loop",until:"16th Street"},
-   {action:"continue",street:"16th Street",until:"Leavenworth Street"},
-   {action:"continue",street:"16th Street",until:"Vinton Street"},
-   {action:"continue",street:"Vinton Street",until:"32nd Avenue"}]}
+   {action:"continue",street:"Capitol Avenue",until:"17th Street"},{action:"left",street:"17th Street",until:"Douglas Street"},{action:"left",street:"Douglas Street",until:"16th Street"},{action:"right",street:"16th Street",until:"Vinton Street"},{action:"right",street:"Vinton Street",until:"32nd Avenue",note:"Start Route 35 interline."}]}
   ]},
  {id:"26",number:"26",name:"North Omaha Circulator",subtitle:"Counterclockwise loop from North Omaha T.C.",directions:[
   {id:"counterclockwise",label:"Counterclockwise",origin:"North Omaha T.C.",destination:"North Omaha T.C.",steps:[
-   {action:"continue",street:"30th Street and Ames Avenue",until:"24th Street"},
-   {action:"continue",street:"24th Street",until:"Titus Avenue"},
-   {action:"continue",street:"Minne Lusa Boulevard",until:"Martin Avenue"},
-   {action:"continue",street:"Martin Avenue",until:"Redick Avenue"},
-   {action:"continue",street:"Redick Avenue",until:"42nd Street"},
-   {action:"continue",street:"Curtis Avenue",until:"Fontenelle Boulevard"},
-   {action:"continue",street:"Fontenelle Boulevard",until:"Sorensen Parkway"},
-   {action:"continue",street:"30th Street",until:"North Omaha Transit Center"}]}
+   {action:"continue",street:"North Omaha T.C.",until:"31st Avenue"},{action:"right",street:"31st Avenue",until:"Ames Avenue"},{action:"right",street:"Ames Avenue",until:"24th Street"},{action:"right",street:"24th Street",until:"Titus Avenue"},{action:"left",street:"Titus Avenue",until:"Minne Lusa Boulevard"},{action:"right",street:"Minne Lusa Boulevard",until:"Martin Avenue"},{action:"left",street:"Martin Avenue",until:"Redick Street"},{action:"right",street:"Redick Street",until:"42nd Street"},{action:"left",street:"42nd Street",until:"Curtis Avenue"},{action:"left",street:"Curtis Avenue",until:"Fontenelle Boulevard"},{action:"right",street:"Fontenelle Boulevard",until:"Sorensen Parkway"},{action:"left",street:"Sorensen Parkway",until:"30th Street"},{action:"right",street:"30th Street",until:"North Omaha T.C."}]},
+  {id:"clockwise",label:"Clockwise",origin:"North Omaha T.C.",destination:"North Omaha T.C.",steps:[
+   {action:"continue",street:"North Omaha T.C.",until:"31st Avenue"},{action:"right",street:"31st Avenue",until:"Ames Avenue"},{action:"right",street:"Ames Avenue",until:"30th Street"},{action:"left",street:"30th Street",until:"Sorensen Parkway"},{action:"left",street:"Sorensen Parkway",until:"Fontenelle Boulevard"},{action:"right",street:"Fontenelle Boulevard",until:"Redick Street"},{action:"left",street:"Redick Street",until:"42nd Street"},{action:"left",street:"42nd Street",until:"Curtis Avenue"},{action:"left",street:"Curtis Avenue",until:"Martin Avenue"},{action:"left",street:"Martin Avenue",until:"Minne Lusa Boulevard"},{action:"right",street:"Minne Lusa Boulevard",until:"Vane Street"},{action:"left",street:"Vane Street",until:"24th Street"},{action:"right",street:"24th Street",until:"Ames Avenue"},{action:"right",street:"Ames Avenue",until:"30th Street"},{action:"left",street:"30th Street",until:"North Omaha T.C."}]}
   ]},
  {id:"15",number:"15",name:"Center Street",subtitle:"22nd & Cuming ↔ Oak View Mall",directions:[
   {id:"westbound",label:"Westbound",origin:"22nd & Cuming",destination:"Oak View Mall",steps:[
-   {action:"continue",street:"Downtown and midtown",until:"42nd Street"},
-   {action:"continue",street:"42nd Street",until:"Center Street"},
-   {action:"continue",street:"Center Street",until:"Aksarben Transit Center"},
-   {action:"continue",street:"West Center Road",until:"84th Street"},
-   {action:"continue",street:"West Center Road",until:"108th Street"},
-   {action:"continue",street:"West Center Road",until:"Oak View Mall"}]},
+   {action:"continue",street:"Dodge Street",until:"16th Street"},{action:"left",street:"16th Street",until:"Farnam Street"},{action:"right",street:"Farnam Street",until:"42nd Street"},{action:"left",street:"42nd Street",until:"Center Street"},{action:"right",street:"Center Street",until:"67th Street"},{action:"right",street:"67th Street",until:"Mercy Road"},{action:"left",street:"Mercy Road",until:"layover"},{action:"continue",street:"Mercy Road",until:"78th Street"},{action:"left",street:"78th Street",until:"West Center Road"},{action:"right",street:"West Center Road",until:"Oakview Drive"},{action:"left",street:"Oakview Mall Drive",until:"143rd Place stop sign"},{action:"right",street:"143rd Street",until:"second mall entrance"},{action:"left",street:"second mall entrance",until:"Oak View layover",note:"Use Route 55 turn-by-turn when interlining with Route 55."}]},
   {id:"eastbound",label:"Eastbound",origin:"Oak View Mall",destination:"22nd & Cuming",steps:[
-   {action:"continue",street:"West Center Road",until:"108th Street"},
-   {action:"continue",street:"West Center Road",until:"84th Street"},
-   {action:"continue",street:"Center Street",until:"Aksarben Transit Center"},
-   {action:"continue",street:"Center Street",until:"42nd Street"},
-   {action:"continue",street:"Midtown and downtown",until:"22nd & Cuming"}]}
+   {action:"continue",street:"Mall Drive",until:"stop sign"},{action:"left",street:"South 143rd Street",until:"Oakview Drive"},{action:"right",street:"Oakview Drive",until:"South 144th Street"},{action:"right",street:"South 144th Street",until:"Center Street"},{action:"right",street:"West Center Road",until:"78th Street"},{action:"left",street:"78th Street",until:"Mercy Road"},{action:"right",street:"Mercy Road",until:"Aksarben Transit Center"},{action:"continue",street:"Mercy Road",until:"67th Street"},{action:"right",street:"67th Street",until:"Center Street"},{action:"left",street:"Center Street",until:"42nd Street"},{action:"left",street:"42nd Street",until:"Farnam Street"},{action:"right",street:"Farnam Street",until:"Turner Boulevard"},{action:"right",street:"Turner Boulevard",until:"Harney Street"},{action:"left",street:"Harney Street",until:"13th Street"},{action:"left",street:"13th Street",until:"Dodge Street"},{action:"left",street:"Dodge Street",until:"layover"}]}
  ]},
  {id:"55",number:"55",name:"Q Street",subtitle:"22nd & Cuming ↔ 118th & Q",directions:[
   {id:"westbound",label:"Westbound",origin:"22nd & Cuming",destination:"118th & Q",steps:[
