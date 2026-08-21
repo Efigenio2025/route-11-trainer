@@ -40,3 +40,8 @@ yarn-error.log*
 /work/
 /.pnpm-store/
 
+# generated deployment and transit-source artifacts
+/site-build*.tar.gz
+/official-omaha-gtfs.zip
+/gtfs-official/
+
