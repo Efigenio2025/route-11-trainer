@@ -96,16 +96,23 @@ async function mountLiveMap(host: HTMLElement) {
   const routeNumber = host.dataset.route || "11";
   const route30South = routeNumber === "30" && host.dataset.direction === "southbound";
   const route11East = routeNumber === "11" && host.dataset.direction === "eastbound";
+  const route4East = routeNumber === "4" && host.dataset.direction === "eastbound";
   const route30Turns = route30South ? ROUTE30_SOUTH_TURNS : ROUTE30_NORTH_TURNS;
   const route30Stops = route30South ? OFFICIAL_ROUTE30_SOUTH_STOPS : OFFICIAL_ROUTE30_NORTH_STOPS;
   const route30Shape = route30South ? ROUTE30_SOUTH_SHAPE : ROUTE30_NORTH_SHAPE;
   const route11Stops = route11East ? ROUTE11_EAST_STOPS : ROUTE11_WEST_STOPS;
   const route11Shape = route11East ? ROUTE11_EAST_SHAPE : ROUTE11_WEST_SHAPE;
-  const checkpoints = routeNumber === "30" ? route30Turns.map(point => point.coordinates) : (host.dataset.direction === "eastbound" ? [...WESTBOUND].reverse() : WESTBOUND);
-  const mapCoordinates = routeNumber === "30" ? route30Shape : route11Shape;
+  const route4Stops = route4East ? ROUTE4_EAST_STOPS : ROUTE4_WEST_STOPS;
+  const route4Shape = route4East ? ROUTE4_EAST_SHAPE : ROUTE4_WEST_SHAPE;
+  const checkpoints = routeNumber === "30"
+    ? route30Turns.map(point => point.coordinates)
+    : routeNumber === "4"
+      ? route4Stops.map(point => point.coordinates)
+      : (host.dataset.direction === "eastbound" ? [...WESTBOUND].reverse() : WESTBOUND);
+  const mapCoordinates = routeNumber === "30" ? route30Shape : routeNumber === "4" ? route4Shape : route11Shape;
   const stops: MapPoint[] = routeNumber === "30"
     ? route30Stops
-    : route11Stops;
+    : routeNumber === "4" ? route4Stops : route11Stops;
   const fallback = document.createElement("canvas");
   fallback.className = "route-canvas";
   fallback.setAttribute("aria-label", `Route ${routeNumber} path`);
@@ -227,4 +234,10 @@ import {
   ROUTE11_WEST_SHAPE,
   ROUTE11_WEST_STOPS,
 } from "./route11-official";
+import {
+  ROUTE4_EAST_SHAPE,
+  ROUTE4_EAST_STOPS,
+  ROUTE4_WEST_SHAPE,
+  ROUTE4_WEST_STOPS,
+} from "./route4-official";
 
