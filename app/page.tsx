@@ -22,11 +22,33 @@ const routes:Route[]=[
   {id:"southbound",label:"Southbound",origin:"31st & Ferry",destination:"Aksarben T.C.",steps:[
    {action:"continue",street:"Turn-around exit",until:"Ferry Street"},{action:"left",street:"Ferry Street",until:"31st Street"},{action:"left",street:"31st / 30th Street",until:"Ames Avenue"},{action:"right",street:"Ames Avenue",until:"31st Avenue"},{action:"left",street:"31st Avenue",until:"North Omaha T.C."},{action:"left",street:"North Omaha T.C.",until:"Mid-route layover"},{action:"continue",street:"North Omaha T.C. exit",until:"30th Street"},{action:"right",street:"30th / Turner Boulevard",until:"Dodge Street"},{action:"right",street:"Dodge Street",until:"42nd Street access road"},{action:"right",street:"42nd Street jug-handle",until:"42nd Street"},{action:"left",street:"42nd Street",until:"Farnam Street"},{action:"right",street:"Farnam Street",until:"Saddle Creek Road"},{action:"left",street:"Saddle Creek Road",until:"Center Street"},{action:"right",street:"Center Street",until:"72nd Street northbound access"},{action:"left",street:"72nd Street access road",until:"Mercy Road"},{action:"right",street:"Mercy Road",until:"Aksarben T.C. layover"}]}
  ]},
- {id:"4",number:"4",name:"Maple Street",subtitle:"Downtown Omaha ↔ Westroads Transit Center",directions:[
-  {id:"westbound",label:"Westbound",origin:"Downtown Omaha",destination:"Westroads T.C.",steps:[
-   {action:"continue",street:"Downtown Omaha",until:"14th & Dodge"},{action:"continue",street:"Cuming Street",until:"24th Street"},{action:"continue",street:"Cuming / Northwest Radial",until:"40th Street"},{action:"continue",street:"Maple Street",until:"60th Street"},{action:"continue",street:"Maple Street",until:"72nd Street"},{action:"continue",street:"Maple Street",until:"90th Street"},{action:"continue",street:"102nd / Blondo",until:"Regency Circle"},{action:"continue",street:"Regency Parkway",until:"Westroads Transit Center"}]},
-  {id:"eastbound",label:"Eastbound",origin:"Westroads T.C.",destination:"Downtown Omaha",steps:[
-   {action:"continue",street:"Westroads Transit Center",until:"102nd & Blondo"},{action:"continue",street:"Maple Street",until:"90th Street"},{action:"continue",street:"Maple Street",until:"72nd Street"},{action:"continue",street:"Maple Street",until:"60th Street"},{action:"continue",street:"Northwest Radial / Cuming",until:"40th Street"},{action:"continue",street:"Cuming Street",until:"24th Street"},{action:"continue",street:"Downtown Omaha",until:"14th & Dodge"},{action:"continue",street:"Downtown loop",until:"22nd & Cuming"}]}
+ {id:"4",number:"4",name:"Maple Street",subtitle:"14th & Farnam ↔ Westroads Transit Center",directions:[
+  {id:"westbound",label:"Westbound",origin:"14th & Farnam",destination:"Westroads T.C.",steps:[
+   {action:"continue",street:"14th & Farnam",until:"Dodge Street"},
+   {action:"right",street:"Dodge Street",until:"15th Street"},
+   {action:"right",street:"15th Street",until:"Capitol Avenue"},
+   {action:"left",street:"Capitol Avenue",until:"16th Street"},
+   {action:"right",street:"16th Street",until:"Cuming Street"},
+   {action:"left",street:"Cuming Street and Northwest Radial Highway",until:"58th Street"},
+   {action:"left",street:"58th Street",until:"Maple Street"},
+   {action:"continue",street:"Maple Street",until:"102nd Street"},
+   {action:"left",street:"102nd Street",until:"Regency Parkway",note:"Merge with California Street"},
+   {action:"right",street:"Regency Parkway",until:"the south entrance of Regency Circle"},
+   {action:"right",street:"Regency Circle",until:"Regency Parkway",note:"Follow Regency Circle around"},
+   {action:"left",street:"Regency Parkway",until:"California Street"},
+   {action:"left",street:"California Street and 102nd Street",until:"Westroads Transit Center entrance"}]},
+  {id:"eastbound",label:"Eastbound",origin:"Westroads T.C.",destination:"14th Street layover",steps:[
+   {action:"continue",street:"Westroads Transit Center exit",until:"Nicholas Street"},
+   {action:"right",street:"Nicholas Street",until:"98th Street"},
+   {action:"right",street:"98th Street",until:"California Street"},
+   {action:"right",street:"California Street",until:"102nd Street"},
+   {action:"right",street:"102nd Street",until:"Maple Street"},
+   {action:"right",street:"Maple Street",until:"Northwest Radial Highway"},
+   {action:"right",street:"Northwest Radial Highway",until:"Cuming Street"},
+   {action:"left",street:"Cuming Street",until:"16th Street"},
+   {action:"right",street:"16th Street",until:"Capitol Avenue"},
+   {action:"left",street:"Capitol Avenue",until:"14th Street"},
+   {action:"right",street:"14th Street",until:"the layover"}]}
  ]},
 ];
 type Screen="home"|"route"|"learn"|"quiz"|"test"|"live"|"progress";
