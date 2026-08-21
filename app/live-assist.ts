@@ -143,17 +143,25 @@ function routeLengths(route: [number, number][]) {
   return values;
 }
 
-function projectOnRoute(point: [number, number], route: [number, number][], lengths: number[], startSegment = 1) {
+function projectOnRoute(
+  point: [number, number], route: [number, number][], lengths: number[],
+  options: {startSegment?:number; endSegment?:number; heading?:number|null; referenceAlong?:number|null} = {},
+) {
   const latitudeScale = 69, longitudeScale = 69 * Math.cos(point[1] * Math.PI / 180);
-  let best = {distance: Infinity, along: 0, segment: 1, routeBearing: 0};
-  for (let i = Math.max(1, startSegment); i < route.length; i++) {
+  let best = {distance: Infinity, along: 0, segment: 1, routeBearing: 0, score:Infinity};
+  const start = Math.max(1, options.startSegment ?? 1), end = Math.min(route.length - 1, options.endSegment ?? route.length - 1);
+  for (let i = start; i <= end; i++) {
     const a = route[i - 1], b = route[i];
     const ax = (a[0] - point[0]) * longitudeScale, ay = (a[1] - point[1]) * latitudeScale;
     const bx = (b[0] - point[0]) * longitudeScale, by = (b[1] - point[1]) * latitudeScale;
     const dx = bx - ax, dy = by - ay, square = dx * dx + dy * dy;
     const t = square ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / square)) : 0;
     const distance = Math.hypot(ax + t * dx, ay + t * dy);
-    if (distance < best.distance) best = {distance, along:lengths[i - 1] + miles(a, b) * t, segment:i, routeBearing:bearing(a, b)};
+    const along = lengths[i - 1] + miles(a, b) * t, routeBearing = bearing(a, b);
+    const headingPenalty = options.heading == null ? 0 : headingDifference(options.heading, routeBearing) / 180 * .10;
+    const continuityPenalty = options.referenceAlong == null ? 0 : Math.max(0, Math.abs(along - options.referenceAlong) - .35) * .08;
+    const score = distance + headingPenalty + continuityPenalty;
+    if (score < best.score) best = {distance, along, segment:i, routeBearing, score};
   }
   return best;
 }
@@ -161,7 +169,7 @@ function projectOnRoute(point: [number, number], route: [number, number][], leng
 function orderedCheckpointProgress(checkpoints: [number, number][], route: [number, number][], lengths: number[]) {
   let segment = 1;
   return checkpoints.map(point => {
-    const match = projectOnRoute(point, route, lengths, segment);
+    const match = projectOnRoute(point, route, lengths, {startSegment:segment});
     segment = match.segment;
     return match.along;
   });
@@ -305,7 +313,8 @@ async function mountLiveMap(host: HTMLElement) {
       if (!navigator.geolocation) { gpsButton.textContent = "GPS unavailable"; return; }
       gpsButton.textContent = "Locating…";
       let targetIndex = 0, promptStage = 0, offRouteFixes = 0, onRouteFixes = 0, offRouteAnnounced = false;
-      let initialized = false, lastPosition: [number, number] | null = null, wrongWayFixes = 0, wrongWayAnnounced = false;
+      let initialized = false, headingLocked = false, lastPosition: [number, number] | null = null, lastRouteSegment = 1, lastAlong: number | null = null;
+      let fixCount = 0, wrongWayFixes = 0, wrongWayAnnounced = false, weakGpsAnnounced = false;
       const announcedStops = new Set<number>();
       followBus = true;
       // Fired synchronously from the Start live GPS tap. This unlocks spoken
@@ -315,14 +324,39 @@ async function mountLiveMap(host: HTMLElement) {
       window.__routeTrainerWatch = navigator.geolocation.watchPosition(position => {
         const current: [number, number] = [position.coords.longitude, position.coords.latitude];
         busPosition = current; busMarker.setLngLat(current); if (followBus) map.easeTo({ center: current, zoom: 15.5, duration: 500 });
-        const routeMatch = projectOnRoute(current, mapCoordinates, cumulativeRouteLengths);
-        if (!initialized) {
+        fixCount += 1;
+        const moved = lastPosition ? miles(lastPosition, current) : 0;
+        const movementHeading = Number.isFinite(position.coords.heading) && position.coords.heading != null
+          ? position.coords.heading
+          : lastPosition && moved > .004 ? bearing(lastPosition, current) : null;
+        const globalMatch = projectOnRoute(current, mapCoordinates, cumulativeRouteLengths, {heading:movementHeading});
+        const localMatch = initialized ? projectOnRoute(current, mapCoordinates, cumulativeRouteLengths, {
+          startSegment:Math.max(1,lastRouteSegment - 18), endSegment:lastRouteSegment + 110,
+          heading:movementHeading, referenceAlong:lastAlong,
+        }) : globalMatch;
+        // During startup, heading decides between overlapping outbound and
+        // inbound paths. After lock-on, continuity prevents jumps to another
+        // pass of the same street while still allowing recovery after a gap.
+        const resolvingHeading = initialized && !headingLocked && movementHeading != null;
+        const routeMatch = !initialized || fixCount <= 4 || resolvingHeading || localMatch.distance > .25 ? globalMatch : localMatch;
+        const reliableGps = position.coords.accuracy <= 55;
+        if (!reliableGps && !weakGpsAnnounced) { weakGpsAnnounced = true; gpsEvent({type:"gps-weak"}); }
+        if (reliableGps) weakGpsAnnounced = false;
+        if (!initialized && reliableGps) {
           const ahead = checkpointProgress.findIndex(progress => progress >= routeMatch.along + .01);
           targetIndex = ahead < 0 ? checkpoints.length - 1 : ahead;
           initialized = true;
           gpsEvent({type:"acquired", index:targetIndex});
+        } else if (initialized && !headingLocked && movementHeading != null) {
+          const corrected = checkpointProgress.findIndex(progress => progress >= routeMatch.along + .01);
+          const correctedTarget = corrected < 0 ? checkpoints.length - 1 : corrected;
+          if (Math.abs(correctedTarget - targetIndex) > 1) {
+            targetIndex = correctedTarget; promptStage = 0;
+            gpsEvent({type:"reacquired", index:targetIndex});
+          }
+          headingLocked = true;
         }
-        while (targetIndex < checkpoints.length - 1 && routeMatch.along > checkpointProgress[targetIndex] + .025) {
+        while (reliableGps && targetIndex < checkpoints.length - 1 && routeMatch.along > checkpointProgress[targetIndex] + .025) {
           const completed = targetIndex++;
           promptStage = 0;
           gpsEvent({type:"complete", index:completed, nextIndex:targetIndex, passed:true});
@@ -337,26 +371,22 @@ async function mountLiveMap(host: HTMLElement) {
         offRouteFixes = onRoute ? 0 : offRouteFixes + 1; onRouteFixes = onRoute ? onRouteFixes + 1 : 0;
         if (offRouteFixes >= 3 && !offRouteAnnounced) { offRouteAnnounced = true; gpsEvent({type:"off-route"}); }
         if (onRouteFixes >= 2 && offRouteAnnounced) { offRouteAnnounced = false; gpsEvent({type:"back-on-route"}); }
-        const moved = lastPosition ? miles(lastPosition, current) : 0;
-        const movementHeading = Number.isFinite(position.coords.heading) && position.coords.heading != null
-          ? position.coords.heading
-          : lastPosition && moved > .004 ? bearing(lastPosition, current) : null;
         const moving = (position.coords.speed ?? 0) > 1.5 || moved > .004;
-        const wrongWay = onRoute && moving && movementHeading != null && headingDifference(movementHeading, routeMatch.routeBearing) > 105;
+        const wrongWay = reliableGps && onRoute && moving && movementHeading != null && headingDifference(movementHeading, routeMatch.routeBearing) > 105;
         wrongWayFixes = wrongWay ? wrongWayFixes + 1 : 0;
         if (wrongWayFixes >= 3 && !wrongWayAnnounced) { wrongWayAnnounced = true; gpsEvent({type:"wrong-way"}); }
         if (!wrongWay && wrongWayAnnounced) { wrongWayAnnounced = false; gpsEvent({type:"direction-correct"}); }
-        lastPosition = current;
+        lastPosition = current; lastRouteSegment = routeMatch.segment; lastAlong = routeMatch.along;
         if (status) { status.textContent = onRoute ? "ON ROUTE" : "OFF ROUTE"; status.className = onRoute ? "tracking" : "off-route"; }
         gpsEvent({type:"status", status:onRoute ? "tracking" : "off-route"});
         if (distance) distance.textContent = `${maneuverDistance < .1 ? Math.round(maneuverDistance * 5280) + " ft" : maneuverDistance.toFixed(1) + " mi"}`;
-        if (onRoute && !wrongWay && promptStage < 1 && maneuverDistance <= .50) { promptStage = 1; gpsEvent({type:"prepare", index:targetIndex, distance:maneuverDistance}); }
-        if (onRoute && !wrongWay && promptStage < 2 && maneuverDistance <= .12) { promptStage = 2; gpsEvent({type:"near", index:targetIndex, distance:maneuverDistance}); }
-        if (onRoute && nearestStop.distance <= 300 / 5280 && !announcedStops.has(nearestStop.i)) {
+        if (reliableGps && onRoute && !wrongWay && promptStage < 1 && maneuverDistance <= .50) { promptStage = 1; gpsEvent({type:"prepare", index:targetIndex, distance:maneuverDistance}); }
+        if (reliableGps && onRoute && !wrongWay && promptStage < 2 && maneuverDistance <= .12) { promptStage = 2; gpsEvent({type:"near", index:targetIndex, distance:maneuverDistance}); }
+        if (reliableGps && onRoute && nearestStop.distance <= 300 / 5280 && !announcedStops.has(nearestStop.i)) {
           announcedStops.add(nearestStop.i);
           gpsEvent({type:"stop-ahead", stopName:nearestStop.stop.name, distanceFeet:Math.round(nearestStop.distance * 5280)});
         }
-        if (onRoute && !wrongWay && promptStage < 3 && routeMatch.along >= checkpointProgress[targetIndex] + .012) {
+        if (reliableGps && onRoute && !wrongWay && promptStage < 3 && routeMatch.along >= checkpointProgress[targetIndex] + .012) {
           const completed = targetIndex;
           if (targetIndex < checkpoints.length - 1) { targetIndex += 1; promptStage = 0; }
           else promptStage = 3;
