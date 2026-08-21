@@ -113,15 +113,13 @@ async function mountLiveMap(host: HTMLElement) {
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false, visualizePitch: false }), "bottom-right");
     map.dragPan.enable(); map.scrollZoom.enable(); map.touchZoomRotate.enable(); map.doubleClickZoom.enable();
     let busPosition: [number, number] = checkpoints[0];
+    const busEl = document.createElement("div");
+    busEl.className = "avl-bus-pin";
+    busEl.setAttribute("aria-label", `Route ${routeNumber} bus location`);
+    busEl.innerHTML = "<span aria-hidden=\"true\">🚌</span>";
+    const busMarker = new mapboxgl.Marker({ element: busEl, anchor: "center" }).setLngLat(busPosition).addTo(map);
     centerButton.onclick = () => map.easeTo({ center: busPosition, zoom: Math.max(map.getZoom(), 14.5), duration: 500 });
     map.on("load", async () => {
-      const busIcon = document.createElement("canvas");
-      busIcon.width = 64; busIcon.height = 64;
-      const iconCtx = busIcon.getContext("2d");
-      if (iconCtx) { iconCtx.fillStyle = "#17263a"; iconCtx.beginPath(); iconCtx.arc(32, 32, 27, 0, Math.PI * 2); iconCtx.fill(); iconCtx.strokeStyle = "#efb81d"; iconCtx.lineWidth = 4; iconCtx.stroke(); iconCtx.font = "30px sans-serif"; iconCtx.textAlign = "center"; iconCtx.textBaseline = "middle"; iconCtx.fillText("🚌", 32, 33); }
-      map.addImage("route-bus", busIcon, { pixelRatio: 2 });
-      map.addSource("route-bus-location", { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: busPosition } } });
-      map.addLayer({ id: "route-bus-symbol", type: "symbol", source: "route-bus-location", layout: { "icon-image": "route-bus", "icon-size": 0.7, "icon-allow-overlap": true, "icon-ignore-placement": true } });
       const routeData = { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: checkpoints } };
       const stopData = { type: "FeatureCollection", features: checkpoints.map((coordinates, i) => ({ type: "Feature", properties: { name: checkpointNames[i], number: i + 1 }, geometry: { type: "Point", coordinates } })) };
       map.addSource("route-11", { type: "geojson", data: routeData });
@@ -152,7 +150,7 @@ async function mountLiveMap(host: HTMLElement) {
       if (window.__routeTrainerWatch != null) navigator.geolocation.clearWatch(window.__routeTrainerWatch);
       window.__routeTrainerWatch = navigator.geolocation.watchPosition(position => {
         const current: [number, number] = [position.coords.longitude, position.coords.latitude];
-        busPosition = current; (map.getSource("route-bus-location") as any)?.setData({ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: current } }); map.easeTo({ center: current, zoom: 15.5, duration: 700 });
+        busPosition = current; busMarker.setLngLat(current); busEl.classList.add("live"); map.easeTo({ center: current, zoom: 15.5, duration: 700 });
         const nearest = checkpoints.map((p, i) => ({ i, d: miles(current, p) })).sort((a, b) => a.d - b.d)[0];
         const status = document.querySelector<HTMLElement>(".live-status span");
         const distance = document.querySelector<HTMLElement>(".next b");
