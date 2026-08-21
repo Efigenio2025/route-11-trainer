@@ -1,0 +1,4 @@
+.route-list{display:grid;gap:16px}
+.route-hero h1{max-width:720px}
+@media(max-width:640px){.route-list{gap:12px}}
+
