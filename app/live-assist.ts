@@ -234,12 +234,14 @@ async function mountLiveMap(host: HTMLElement) {
       if (!navigator.geolocation) { gpsButton.textContent = "GPS unavailable"; return; }
       gpsButton.textContent = "Locating…";
       let targetIndex = 0, promptStage = 0, offRouteFixes = 0, onRouteFixes = 0, offRouteAnnounced = false, completionArmed = false, closestDistance = Infinity;
+      const announcedStops = new Set<number>();
       followBus = true;
       if (window.__routeTrainerWatch != null) navigator.geolocation.clearWatch(window.__routeTrainerWatch);
       window.__routeTrainerWatch = navigator.geolocation.watchPosition(position => {
         const current: [number, number] = [position.coords.longitude, position.coords.latitude];
         busPosition = current; busMarker.setLngLat(current); if (followBus) map.easeTo({ center: current, zoom: 15.5, duration: 500 });
         const maneuverDistance = miles(current, checkpoints[Math.min(targetIndex, checkpoints.length - 1)]);
+        const nearestStop = stops.map((stop, i) => ({i, stop, distance:miles(current, stop.coordinates)})).sort((a, b) => a.distance - b.distance)[0];
         const routeDistance = distanceToRoute(current, mapCoordinates);
         const status = document.querySelector<HTMLElement>(".live-status span");
         const distance = document.querySelector<HTMLElement>(".next b");
@@ -253,6 +255,10 @@ async function mountLiveMap(host: HTMLElement) {
         if (distance) distance.textContent = `${maneuverDistance < .1 ? Math.round(maneuverDistance * 5280) + " ft" : maneuverDistance.toFixed(1) + " mi"}`;
         if (onRoute && promptStage < 1 && maneuverDistance <= .35) { promptStage = 1; gpsEvent({type:"prepare", index:targetIndex, distance:maneuverDistance}); }
         if (onRoute && promptStage < 2 && maneuverDistance <= .10) { promptStage = 2; gpsEvent({type:"near", index:targetIndex, distance:maneuverDistance}); }
+        if (onRoute && nearestStop.distance <= 150 / 5280 && !announcedStops.has(nearestStop.i)) {
+          announcedStops.add(nearestStop.i);
+          gpsEvent({type:"stop-ahead", stopName:nearestStop.stop.name, distanceFeet:Math.round(nearestStop.distance * 5280)});
+        }
         if (onRoute && maneuverDistance <= .04) completionArmed = true;
         if (completionArmed) closestDistance = Math.min(closestDistance, maneuverDistance);
         if (onRoute && promptStage < 3 && completionArmed && (maneuverDistance <= .012 || maneuverDistance > closestDistance + .015)) {
