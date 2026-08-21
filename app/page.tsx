@@ -49,6 +49,36 @@ const routes:Route[]=[
    {action:"right",street:"16th Street",until:"Capitol Avenue"},
    {action:"left",street:"Capitol Avenue",until:"14th Street"},
    {action:"right",street:"14th Street",until:"the layover"}]}
+  ]},
+ {id:"35",number:"35",name:"North 33rd Street",subtitle:"32nd & Vinton ↔ North Omaha Transit Center",directions:[
+  {id:"northbound",label:"Northbound",origin:"32nd & Vinton",destination:"North Omaha T.C.",steps:[
+   {action:"continue",street:"32nd Avenue",until:"Ed Creighton Avenue"},
+   {action:"continue",street:"Park Avenue",until:"Dodge Street"},
+   {action:"continue",street:"30th Street",until:"California Street"},
+   {action:"continue",street:"33rd Street",until:"Lake Street"},
+   {action:"continue",street:"Lake Street",until:"40th Street"},
+   {action:"continue",street:"40th Street",until:"Pratt Street"},
+   {action:"continue",street:"Paxton Boulevard",until:"North Omaha Transit Center"}]},
+  {id:"southbound",label:"Southbound",origin:"North Omaha T.C.",destination:"32nd & Vinton",steps:[
+   {action:"continue",street:"Paxton Boulevard",until:"40th Street"},
+   {action:"continue",street:"40th Street",until:"Lake Street"},
+   {action:"continue",street:"Lake Street",until:"33rd Avenue"},
+   {action:"continue",street:"33rd Street",until:"California Street"},
+   {action:"continue",street:"California and 30th Street",until:"Dodge Street"},
+   {action:"continue",street:"Park Avenue",until:"Ed Creighton Avenue"},
+   {action:"continue",street:"32nd Avenue",until:"Vinton Street"}]}
+ ]},
+ {id:"36",number:"36",name:"16th & Vinton Street",subtitle:"32nd & Vinton ↔ Downtown Omaha",directions:[
+  {id:"northbound",label:"Northbound",origin:"32nd & Vinton",destination:"16th & Capitol",steps:[
+   {action:"continue",street:"Vinton Street",until:"16th Street"},
+   {action:"continue",street:"16th Street",until:"Jackson Street"},
+   {action:"continue",street:"16th Street",until:"Douglas Street"},
+   {action:"continue",street:"15th and Dodge Streets",until:"Capitol Avenue"}]},
+  {id:"southbound",label:"Southbound",origin:"16th & Capitol",destination:"32nd & Vinton",steps:[
+   {action:"continue",street:"Downtown loop",until:"16th Street"},
+   {action:"continue",street:"16th Street",until:"Leavenworth Street"},
+   {action:"continue",street:"16th Street",until:"Vinton Street"},
+   {action:"continue",street:"Vinton Street",until:"32nd Avenue"}]}
  ]},
 ];
 type Screen="home"|"route"|"learn"|"quiz"|"test"|"live"|"progress";
