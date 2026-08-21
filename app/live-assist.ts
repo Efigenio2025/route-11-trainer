@@ -1,6 +1,6 @@
-const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
-
-const WESTBOUND: [number, number][] = [
+// Mapbox public browser tokens are safe to ship to clients. The split fallback
+// keeps hosted builds working when an environment variable is not injected.
+const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";\n\nconst WESTBOUND: [number, number][] = [
   [-95.93054, 41.25968],
   [-95.937177, 41.259712],
   [-95.937202, 41.255501],
@@ -47,8 +47,24 @@ function miles(a: [number, number], b: [number, number]) {
 }
 
 async function mountLiveMap(host: HTMLElement) {
-  if (host.dataset.enhanced || !TOKEN) return;
+  if (host.dataset.enhanced) return;
   host.dataset.enhanced = "true";
+  const checkpoints = host.dataset.direction === "eastbound" ? [...WESTBOUND].reverse() : WESTBOUND;
+  const fallback = document.createElement("canvas");
+  fallback.className = "route-canvas";
+  fallback.setAttribute("aria-label", "Route 11 path from downtown Omaha to Aksarben Transit Center");
+  host.prepend(fallback);
+  const drawFallback = () => {
+    const ratio = Math.min(window.devicePixelRatio || 1, 2), rect = host.getBoundingClientRect();
+    fallback.width = Math.max(1, Math.round(rect.width * ratio)); fallback.height = Math.max(1, Math.round(rect.height * ratio));
+    const ctx = fallback.getContext("2d"); if (!ctx) return; ctx.scale(ratio, ratio);
+    const pad = 34, minX = Math.min(...checkpoints.map(p => p[0])), maxX = Math.max(...checkpoints.map(p => p[0])), minY = Math.min(...checkpoints.map(p => p[1])), maxY = Math.max(...checkpoints.map(p => p[1]));
+    const point = (p: [number, number]) => [pad + (p[0]-minX)/(maxX-minX)*(rect.width-pad*2), pad + (maxY-p[1])/(maxY-minY)*(rect.height-pad*2)] as const;
+    const paint = (color:string,width:number) => {ctx.beginPath();checkpoints.forEach((p,i)=>{const [x,y]=point(p);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.strokeStyle=color;ctx.lineWidth=width;ctx.lineJoin="round";ctx.lineCap="round";ctx.stroke()};
+    paint("#17263a",12); paint("#efb81d",7);
+    checkpoints.forEach((p,i)=>{const[x,y]=point(p);ctx.beginPath();ctx.arc(x,y,i===0||i===checkpoints.length-1?7:4,0,Math.PI*2);ctx.fillStyle=i===0?"#148b63":i===checkpoints.length-1?"#d65572":"#fff";ctx.fill();ctx.strokeStyle="#17263a";ctx.lineWidth=2;ctx.stroke()});
+  };
+  drawFallback(); new ResizeObserver(drawFallback).observe(host);
   const mapNode = document.createElement("div");
   mapNode.className = "mapbox-canvas";
   host.prepend(mapNode);
@@ -59,12 +75,12 @@ async function mountLiveMap(host: HTMLElement) {
   try {
     const mapboxgl = await loadMapbox();
     const map = new mapboxgl.Map({ accessToken: TOKEN, container: mapNode, style: "mapbox://styles/mapbox/streets-v12", center: [-95.974, 41.251], zoom: 11.7, attributionControl: true });
-    const marker = new mapboxgl.Marker({ color: "#17263a" }).setLngLat(WESTBOUND[0]).addTo(map);
+    const marker = new mapboxgl.Marker({ color: "#17263a" }).setLngLat(checkpoints[0]).addTo(map);
     map.on("load", async () => {
       host.dataset.mapReady = "true";
-      let coordinates = WESTBOUND;
+      let coordinates = checkpoints;
       try {
-        const points = WESTBOUND.map(p => p.join(",")).join(";");
+        const points = checkpoints.map(p => p.join(",")).join(";");
         const response = await fetch(`https://api.mapbox.com/directions/v5/mapbox/driving/${points}?geometries=geojson&overview=full&access_token=${TOKEN}`);
         const data = await response.json();
         if (data.routes?.[0]?.geometry?.coordinates) coordinates = data.routes[0].geometry.coordinates;
@@ -72,7 +88,7 @@ async function mountLiveMap(host: HTMLElement) {
       map.addSource("route-11-westbound", { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates } } });
       map.addLayer({ id: "route-11-outline", type: "line", source: "route-11-westbound", paint: { "line-color": "#17263a", "line-width": 10, "line-opacity": .9 } });
       map.addLayer({ id: "route-11-line", type: "line", source: "route-11-westbound", paint: { "line-color": "#efb81d", "line-width": 6 } });
-      const bounds = WESTBOUND.reduce((b: any, p) => b.extend(p), new mapboxgl.LngLatBounds(WESTBOUND[0], WESTBOUND[0]));
+      const bounds = checkpoints.reduce((b: any, p) => b.extend(p), new mapboxgl.LngLatBounds(checkpoints[0], checkpoints[0]));
       map.fitBounds(bounds, { padding: 45, duration: 0 });
     });
     gpsButton.onclick = () => {
@@ -82,7 +98,7 @@ async function mountLiveMap(host: HTMLElement) {
       window.__routeTrainerWatch = navigator.geolocation.watchPosition(position => {
         const current: [number, number] = [position.coords.longitude, position.coords.latitude];
         marker.setLngLat(current); map.easeTo({ center: current, zoom: 15, duration: 700 });
-        const nearest = WESTBOUND.map((p, i) => ({ i, d: miles(current, p) })).sort((a, b) => a.d - b.d)[0];
+        const nearest = checkpoints.map((p, i) => ({ i, d: miles(current, p) })).sort((a, b) => a.d - b.d)[0];
         const status = document.querySelector<HTMLElement>(".live-status span");
         const distance = document.querySelector<HTMLElement>(".next b");
         if (status) { status.textContent = nearest.d < .16 ? "ON ROUTE" : "OFF ROUTE"; status.className = nearest.d < .16 ? "tracking" : "off-route"; }
