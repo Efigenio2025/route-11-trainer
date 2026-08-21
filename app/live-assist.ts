@@ -126,6 +126,47 @@ function distanceToRoute(point: [number, number], route: [number, number][]) {
   return nearest;
 }
 
+function bearing(a: [number, number], b: [number, number]) {
+  const rad = Math.PI / 180, lat1 = a[1] * rad, lat2 = b[1] * rad, dLng = (b[0] - a[0]) * rad;
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  return (Math.atan2(y, x) / rad + 360) % 360;
+}
+
+function headingDifference(a: number, b: number) {
+  return Math.abs(((a - b + 540) % 360) - 180);
+}
+
+function routeLengths(route: [number, number][]) {
+  const values = [0];
+  for (let i = 1; i < route.length; i++) values.push(values[i - 1] + miles(route[i - 1], route[i]));
+  return values;
+}
+
+function projectOnRoute(point: [number, number], route: [number, number][], lengths: number[], startSegment = 1) {
+  const latitudeScale = 69, longitudeScale = 69 * Math.cos(point[1] * Math.PI / 180);
+  let best = {distance: Infinity, along: 0, segment: 1, routeBearing: 0};
+  for (let i = Math.max(1, startSegment); i < route.length; i++) {
+    const a = route[i - 1], b = route[i];
+    const ax = (a[0] - point[0]) * longitudeScale, ay = (a[1] - point[1]) * latitudeScale;
+    const bx = (b[0] - point[0]) * longitudeScale, by = (b[1] - point[1]) * latitudeScale;
+    const dx = bx - ax, dy = by - ay, square = dx * dx + dy * dy;
+    const t = square ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / square)) : 0;
+    const distance = Math.hypot(ax + t * dx, ay + t * dy);
+    if (distance < best.distance) best = {distance, along:lengths[i - 1] + miles(a, b) * t, segment:i, routeBearing:bearing(a, b)};
+  }
+  return best;
+}
+
+function orderedCheckpointProgress(checkpoints: [number, number][], route: [number, number][], lengths: number[]) {
+  let segment = 1;
+  return checkpoints.map(point => {
+    const match = projectOnRoute(point, route, lengths, segment);
+    segment = match.segment;
+    return match.along;
+  });
+}
+
 function spacedCheckpoints(route: [number, number][], count: number) {
   if (count <= 1) return [route[route.length - 1]];
   const lengths = [0];
@@ -177,6 +218,8 @@ async function mountLiveMap(host: HTMLElement) {
     ? route30Turns.map(point => point.coordinates)
     : routeNumber === "95" ? (route95Am ? ROUTE95_AM_TURNS : ROUTE95_PM_TURNS)
     : spacedCheckpoints(mapCoordinates, maneuverCount);
+  const cumulativeRouteLengths = routeLengths(mapCoordinates);
+  const checkpointProgress = orderedCheckpointProgress(checkpoints, mapCoordinates, cumulativeRouteLengths);
   const stops: MapPoint[] = routeNumber === "30"
     ? route30Stops
     : routeNumber === "4" ? route4Stops : routeNumber === "35" ? route35Stops : routeNumber === "36" ? route36Stops : routeNumber === "26" ? ROUTE26_LOOP_STOPS : routeNumber === "15" ? route15Stops : routeNumber === "55" ? route55Stops : routeNumber === "95" ? route95Stops : route11Stops;
@@ -261,19 +304,32 @@ async function mountLiveMap(host: HTMLElement) {
     const startGps = () => {
       if (!navigator.geolocation) { gpsButton.textContent = "GPS unavailable"; return; }
       gpsButton.textContent = "Locating…";
-      let targetIndex = 0, promptStage = 0, offRouteFixes = 0, onRouteFixes = 0, offRouteAnnounced = false, completionArmed = false, closestDistance = Infinity;
+      let targetIndex = 0, promptStage = 0, offRouteFixes = 0, onRouteFixes = 0, offRouteAnnounced = false;
+      let initialized = false, lastPosition: [number, number] | null = null, wrongWayFixes = 0, wrongWayAnnounced = false;
       const announcedStops = new Set<number>();
       followBus = true;
       // Fired synchronously from the Start live GPS tap. This unlocks spoken
       // guidance on iPhone Safari before asynchronous location fixes arrive.
-      gpsEvent({type:"start", index:0});
+      gpsEvent({type:"start"});
       if (window.__routeTrainerWatch != null) navigator.geolocation.clearWatch(window.__routeTrainerWatch);
       window.__routeTrainerWatch = navigator.geolocation.watchPosition(position => {
         const current: [number, number] = [position.coords.longitude, position.coords.latitude];
         busPosition = current; busMarker.setLngLat(current); if (followBus) map.easeTo({ center: current, zoom: 15.5, duration: 500 });
-        const maneuverDistance = miles(current, checkpoints[Math.min(targetIndex, checkpoints.length - 1)]);
+        const routeMatch = projectOnRoute(current, mapCoordinates, cumulativeRouteLengths);
+        if (!initialized) {
+          const ahead = checkpointProgress.findIndex(progress => progress >= routeMatch.along + .01);
+          targetIndex = ahead < 0 ? checkpoints.length - 1 : ahead;
+          initialized = true;
+          gpsEvent({type:"acquired", index:targetIndex});
+        }
+        while (targetIndex < checkpoints.length - 1 && routeMatch.along > checkpointProgress[targetIndex] + .025) {
+          const completed = targetIndex++;
+          promptStage = 0;
+          gpsEvent({type:"complete", index:completed, nextIndex:targetIndex, passed:true});
+        }
+        const maneuverDistance = Math.max(0, checkpointProgress[Math.min(targetIndex, checkpointProgress.length - 1)] - routeMatch.along);
         const nearestStop = stops.map((stop, i) => ({i, stop, distance:miles(current, stop.coordinates)})).sort((a, b) => a.distance - b.distance)[0];
-        const routeDistance = distanceToRoute(current, mapCoordinates);
+        const routeDistance = routeMatch.distance;
         const status = document.querySelector<HTMLElement>(".live-status span");
         const distance = document.querySelector<HTMLElement>(".next b");
         const routeTolerance = Math.max(.12, position.coords.accuracy * 0.000621371 + .04);
@@ -281,20 +337,28 @@ async function mountLiveMap(host: HTMLElement) {
         offRouteFixes = onRoute ? 0 : offRouteFixes + 1; onRouteFixes = onRoute ? onRouteFixes + 1 : 0;
         if (offRouteFixes >= 3 && !offRouteAnnounced) { offRouteAnnounced = true; gpsEvent({type:"off-route"}); }
         if (onRouteFixes >= 2 && offRouteAnnounced) { offRouteAnnounced = false; gpsEvent({type:"back-on-route"}); }
+        const moved = lastPosition ? miles(lastPosition, current) : 0;
+        const movementHeading = Number.isFinite(position.coords.heading) && position.coords.heading != null
+          ? position.coords.heading
+          : lastPosition && moved > .004 ? bearing(lastPosition, current) : null;
+        const moving = (position.coords.speed ?? 0) > 1.5 || moved > .004;
+        const wrongWay = onRoute && moving && movementHeading != null && headingDifference(movementHeading, routeMatch.routeBearing) > 105;
+        wrongWayFixes = wrongWay ? wrongWayFixes + 1 : 0;
+        if (wrongWayFixes >= 3 && !wrongWayAnnounced) { wrongWayAnnounced = true; gpsEvent({type:"wrong-way"}); }
+        if (!wrongWay && wrongWayAnnounced) { wrongWayAnnounced = false; gpsEvent({type:"direction-correct"}); }
+        lastPosition = current;
         if (status) { status.textContent = onRoute ? "ON ROUTE" : "OFF ROUTE"; status.className = onRoute ? "tracking" : "off-route"; }
         gpsEvent({type:"status", status:onRoute ? "tracking" : "off-route"});
         if (distance) distance.textContent = `${maneuverDistance < .1 ? Math.round(maneuverDistance * 5280) + " ft" : maneuverDistance.toFixed(1) + " mi"}`;
-        if (onRoute && promptStage < 1 && maneuverDistance <= .35) { promptStage = 1; gpsEvent({type:"prepare", index:targetIndex, distance:maneuverDistance}); }
-        if (onRoute && promptStage < 2 && maneuverDistance <= .10) { promptStage = 2; gpsEvent({type:"near", index:targetIndex, distance:maneuverDistance}); }
+        if (onRoute && !wrongWay && promptStage < 1 && maneuverDistance <= .50) { promptStage = 1; gpsEvent({type:"prepare", index:targetIndex, distance:maneuverDistance}); }
+        if (onRoute && !wrongWay && promptStage < 2 && maneuverDistance <= .12) { promptStage = 2; gpsEvent({type:"near", index:targetIndex, distance:maneuverDistance}); }
         if (onRoute && nearestStop.distance <= 300 / 5280 && !announcedStops.has(nearestStop.i)) {
           announcedStops.add(nearestStop.i);
           gpsEvent({type:"stop-ahead", stopName:nearestStop.stop.name, distanceFeet:Math.round(nearestStop.distance * 5280)});
         }
-        if (onRoute && maneuverDistance <= .04) completionArmed = true;
-        if (completionArmed) closestDistance = Math.min(closestDistance, maneuverDistance);
-        if (onRoute && promptStage < 3 && completionArmed && (maneuverDistance <= .012 || maneuverDistance > closestDistance + .015)) {
+        if (onRoute && !wrongWay && promptStage < 3 && routeMatch.along >= checkpointProgress[targetIndex] + .012) {
           const completed = targetIndex;
-          if (targetIndex < checkpoints.length - 1) { targetIndex += 1; promptStage = 0; completionArmed = false; closestDistance = Infinity; }
+          if (targetIndex < checkpoints.length - 1) { targetIndex += 1; promptStage = 0; }
           else promptStage = 3;
           gpsEvent({type:"complete", index:completed, nextIndex:targetIndex, finished:completed === checkpoints.length - 1});
         }
