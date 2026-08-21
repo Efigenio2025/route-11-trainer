@@ -18,12 +18,6 @@ const WESTBOUND: [number, number][] = [
   [-96.0146, 41.238827],
 ];
 
-const WESTBOUND_STOPS = [
-  "11th & Dodge", "16th & Dodge", "16th & Howard", "St. Mary's Ave",
-  "Leavenworth", "60th & Leavenworth", "60th & Pacific", "67th & Pacific",
-  "67th & Pine", "Aksarben Drive", "Mercy Road", "Aksarben T.C.",
-];
-
 type MapPoint = { name: string; coordinates: [number, number] };
 
 // Route 30 maneuver points come from the turn-direction sheet. These shape
@@ -101,15 +95,17 @@ async function mountLiveMap(host: HTMLElement) {
   host.dataset.enhanced = "true";
   const routeNumber = host.dataset.route || "11";
   const route30South = routeNumber === "30" && host.dataset.direction === "southbound";
+  const route11East = routeNumber === "11" && host.dataset.direction === "eastbound";
   const route30Turns = route30South ? ROUTE30_SOUTH_TURNS : ROUTE30_NORTH_TURNS;
   const route30Stops = route30South ? OFFICIAL_ROUTE30_SOUTH_STOPS : OFFICIAL_ROUTE30_NORTH_STOPS;
   const route30Shape = route30South ? ROUTE30_SOUTH_SHAPE : ROUTE30_NORTH_SHAPE;
+  const route11Stops = route11East ? ROUTE11_EAST_STOPS : ROUTE11_WEST_STOPS;
+  const route11Shape = route11East ? ROUTE11_EAST_SHAPE : ROUTE11_WEST_SHAPE;
   const checkpoints = routeNumber === "30" ? route30Turns.map(point => point.coordinates) : (host.dataset.direction === "eastbound" ? [...WESTBOUND].reverse() : WESTBOUND);
-  const mapCoordinates = routeNumber === "30" ? route30Shape : checkpoints;
-  const checkpointNames = routeNumber === "30" ? route30Turns.map(point => point.name) : (host.dataset.direction === "eastbound" ? [...WESTBOUND_STOPS].reverse() : WESTBOUND_STOPS);
+  const mapCoordinates = routeNumber === "30" ? route30Shape : route11Shape;
   const stops: MapPoint[] = routeNumber === "30"
     ? route30Stops
-    : checkpoints.map((coordinates, index) => ({ name: checkpointNames[index], coordinates }));
+    : route11Stops;
   const fallback = document.createElement("canvas");
   fallback.className = "route-canvas";
   fallback.setAttribute("aria-label", `Route ${routeNumber} path`);
@@ -175,28 +171,13 @@ async function mountLiveMap(host: HTMLElement) {
         map.addLayer({ id: "route-30-turn-dots", type: "circle", source: "route-30-turns", paint: { "circle-radius": 4, "circle-color": "#efb81d", "circle-stroke-color": "#17263a", "circle-stroke-width": 2 } });
       }
       stops.forEach((stop, i) => {
-        if (routeNumber === "30" && i !== 0 && i !== stops.length - 1) return;
+        if (i !== 0 && i !== stops.length - 1) return;
         const stopEl = document.createElement("button");
         stopEl.className = `route-stop-marker ${i === 0 ? "start" : i === stops.length - 1 ? "finish" : ""}`;
         stopEl.type = "button"; stopEl.title = stop.name; stopEl.setAttribute("aria-label", `Stop ${i + 1}: ${stop.name}`); stopEl.innerHTML = `<span>${i + 1}</span><small>${stop.name}</small>`;
         new mapboxgl.Marker({ element: stopEl, anchor: "center" }).setLngLat(stop.coordinates).addTo(map);
       });
       host.dataset.mapReady = "true";
-      if (routeNumber !== "30") {
-        try {
-          const legs = await Promise.all(checkpoints.slice(0, -1).map(async (from, index) => {
-            const to = checkpoints[index + 1];
-            const response = await fetch(`https://api.mapbox.com/directions/v5/mapbox/driving/${from.join(",")};${to.join(",")}?geometries=geojson&overview=full&steps=false&access_token=${TOKEN}`);
-            if (!response.ok) return [from, to] as [number, number][];
-            const data = await response.json();
-            return (data.routes?.[0]?.geometry?.coordinates || [from, to]) as [number, number][];
-          }));
-          const streetGeometry = legs.flatMap((leg, index) => index ? leg.slice(1) : leg);
-          if (streetGeometry.length > checkpoints.length) {
-            (map.getSource("route-11") as any).setData({ ...routeData, geometry: { type: "LineString", coordinates: streetGeometry } });
-          }
-        } catch { /* The checkpoint route is already visible. */ }
-      }
       const bounds = mapCoordinates.reduce((b: any, p) => b.extend(p), new mapboxgl.LngLatBounds(mapCoordinates[0], mapCoordinates[0]));
       map.fitBounds(bounds, { padding: 45, duration: 0 });
     });
@@ -240,4 +221,10 @@ import {
   ROUTE30_SOUTH_SHAPE,
   ROUTE30_SOUTH_STOPS as OFFICIAL_ROUTE30_SOUTH_STOPS,
 } from "./route30-official";
+import {
+  ROUTE11_EAST_SHAPE,
+  ROUTE11_EAST_STOPS,
+  ROUTE11_WEST_SHAPE,
+  ROUTE11_WEST_STOPS,
+} from "./route11-official";
 
