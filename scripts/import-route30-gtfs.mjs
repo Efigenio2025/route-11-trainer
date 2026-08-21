@@ -4,7 +4,7 @@ import path from "node:path";
 const routeNumber = process.argv[2] || "30";
 const feedDir = path.resolve("gtfs-official");
 const output = path.resolve(`app/route${routeNumber}-official.ts`);
-const directionNames = routeNumber === "11" ? ["WEST", "EAST"] : ["NORTH", "SOUTH"];
+const directionNames = routeNumber === "11" || routeNumber === "4" ? ["WEST", "EAST"] : ["NORTH", "SOUTH"];
 
 function parseCsv(text) {
   const rows = [];
