@@ -141,11 +141,11 @@ async function mountLiveMap(host: HTMLElement) {
   const route36Stops = route36South ? ROUTE36_SOUTH_STOPS : ROUTE36_NORTH_STOPS;
   const route36Shape = route36South ? ROUTE36_SOUTH_SHAPE : ROUTE36_NORTH_SHAPE;
   const maneuverCount = Number(host.dataset.maneuvers || 1);
-  const mapCoordinates = routeNumber === "30" ? route30Shape : routeNumber === "4" ? route4Shape : routeNumber === "35" ? route35Shape : routeNumber === "36" ? route36Shape : route11Shape;
+  const mapCoordinates = routeNumber === "30" ? route30Shape : routeNumber === "4" ? route4Shape : routeNumber === "35" ? route35Shape : routeNumber === "36" ? route36Shape : routeNumber === "26" ? ROUTE26_LOOP_SHAPE : route11Shape;
   const checkpoints = routeNumber === "30" ? route30Turns.map(point => point.coordinates) : spacedCheckpoints(mapCoordinates, maneuverCount);
   const stops: MapPoint[] = routeNumber === "30"
     ? route30Stops
-    : routeNumber === "4" ? route4Stops : routeNumber === "35" ? route35Stops : routeNumber === "36" ? route36Stops : route11Stops;
+    : routeNumber === "4" ? route4Stops : routeNumber === "35" ? route35Stops : routeNumber === "36" ? route36Stops : routeNumber === "26" ? ROUTE26_LOOP_STOPS : route11Stops;
   const fallback = document.createElement("canvas");
   fallback.className = "route-canvas";
   fallback.setAttribute("aria-label", `Route ${routeNumber} path`);
@@ -305,4 +305,8 @@ import {
   ROUTE36_SOUTH_SHAPE,
   ROUTE36_SOUTH_STOPS,
 } from "./route36-official";
+import {
+  ROUTE26_LOOP_SHAPE,
+  ROUTE26_LOOP_STOPS,
+} from "./route26-official";
 
