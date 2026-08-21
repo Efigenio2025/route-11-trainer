@@ -120,6 +120,24 @@ const routes:Route[]=[
    {action:"continue",street:"84th Street",until:"Center Street"},
    {action:"continue",street:"Mercy Road",until:"Aksarben Transit Center"},
    {action:"continue",street:"Center Street and downtown",until:"22nd & Cuming"}]}
+  ]},
+ {id:"95",number:"95",name:"Bellevue Express",subtitle:"Downtown ↔ Bellevue park-and-rides",directions:[
+  {id:"pm-express",label:"PM Express",origin:"22nd & Cuming",destination:"Downtown via Bellevue",steps:[
+   {action:"continue",street:"Downtown Omaha",until:"13th & J Street"},
+   {action:"continue",street:"Kennedy Freeway and Fort Crook Road",until:"Marathon Ventures Park & Ride"},
+   {action:"continue",street:"Galvin Road",until:"Bellevue University Park & Ride"},
+   {action:"continue",street:"Harlan Drive",until:"No Frills Park & Ride"},
+   {action:"continue",street:"Fort Crook Road",until:"Lied Activity Center"},
+   {action:"continue",street:"Fort Crook Road",until:"MCC South Transit Center"},
+   {action:"continue",street:"Express return to downtown",until:"16th & Davenport"}]},
+  {id:"am-express",label:"AM Express",origin:"Downtown Omaha",destination:"Downtown via Bellevue",steps:[
+   {action:"continue",street:"Express to Bellevue",until:"MCC South Transit Center"},
+   {action:"continue",street:"Fort Crook Road",until:"Marathon Ventures Park & Ride"},
+   {action:"continue",street:"Galvin Road",until:"Bellevue University Park & Ride"},
+   {action:"continue",street:"Harlan Drive",until:"No Frills Park & Ride"},
+   {action:"continue",street:"Fort Crook Road",until:"Lied Activity Center"},
+   {action:"continue",street:"Kennedy Freeway",until:"13th & J Street"},
+   {action:"continue",street:"Downtown Omaha",until:"22nd & Cuming"}]}
  ]},
 ];
 type Screen="home"|"route"|"learn"|"quiz"|"test"|"live"|"progress";
