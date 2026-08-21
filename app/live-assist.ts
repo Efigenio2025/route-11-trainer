@@ -134,16 +134,18 @@ async function mountLiveMap(host: HTMLElement) {
   const route11Shape = route11East ? ROUTE11_EAST_SHAPE : ROUTE11_WEST_SHAPE;
   const route4Stops = route4East ? ROUTE4_EAST_STOPS : ROUTE4_WEST_STOPS;
   const route4Shape = route4East ? ROUTE4_EAST_SHAPE : ROUTE4_WEST_SHAPE;
+  const route35South = routeNumber === "35" && host.dataset.direction === "southbound";
+  const route35Stops = route35South ? ROUTE35_SOUTH_STOPS : ROUTE35_NORTH_STOPS;
+  const route35Shape = route35South ? ROUTE35_SOUTH_SHAPE : ROUTE35_NORTH_SHAPE;
+  const route36South = routeNumber === "36" && host.dataset.direction === "southbound";
+  const route36Stops = route36South ? ROUTE36_SOUTH_STOPS : ROUTE36_NORTH_STOPS;
+  const route36Shape = route36South ? ROUTE36_SOUTH_SHAPE : ROUTE36_NORTH_SHAPE;
   const maneuverCount = Number(host.dataset.maneuvers || 1);
-  const checkpoints = routeNumber === "30"
-    ? route30Turns.map(point => point.coordinates)
-    : routeNumber === "11" && maneuverCount === 10
-      ? spacedCheckpoints(route11Shape, maneuverCount)
-      : spacedCheckpoints(route4Shape, maneuverCount);
-  const mapCoordinates = routeNumber === "30" ? route30Shape : routeNumber === "4" ? route4Shape : route11Shape;
+  const mapCoordinates = routeNumber === "30" ? route30Shape : routeNumber === "4" ? route4Shape : routeNumber === "35" ? route35Shape : routeNumber === "36" ? route36Shape : route11Shape;
+  const checkpoints = routeNumber === "30" ? route30Turns.map(point => point.coordinates) : spacedCheckpoints(mapCoordinates, maneuverCount);
   const stops: MapPoint[] = routeNumber === "30"
     ? route30Stops
-    : routeNumber === "4" ? route4Stops : route11Stops;
+    : routeNumber === "4" ? route4Stops : routeNumber === "35" ? route35Stops : routeNumber === "36" ? route36Stops : route11Stops;
   const fallback = document.createElement("canvas");
   fallback.className = "route-canvas";
   fallback.setAttribute("aria-label", `Route ${routeNumber} path`);
@@ -291,4 +293,16 @@ import {
   ROUTE4_WEST_SHAPE,
   ROUTE4_WEST_STOPS,
 } from "./route4-official";
+import {
+  ROUTE35_NORTH_SHAPE,
+  ROUTE35_NORTH_STOPS,
+  ROUTE35_SOUTH_SHAPE,
+  ROUTE35_SOUTH_STOPS,
+} from "./route35-official";
+import {
+  ROUTE36_NORTH_SHAPE,
+  ROUTE36_NORTH_STOPS,
+  ROUTE36_SOUTH_SHAPE,
+  ROUTE36_SOUTH_STOPS,
+} from "./route36-official";
 
