@@ -21,6 +21,19 @@ const WESTBOUND_STOPS = [
   "67th & Pine", "Aksarben Drive", "Mercy Road", "Aksarben T.C.",
 ];
 
+const ROUTE30_NORTH: [number, number][] = [
+  [-96.0146,41.23883],[-96.0155,41.2411],[-96.0155,41.2329],[-95.9967,41.2330],
+  [-95.9961,41.2572],[-95.9772,41.2572],[-95.9772,41.2597],[-95.9560,41.2597],
+  [-95.9562,41.2962],[-95.9580,41.2992],[-95.9562,41.3040],
+];
+const ROUTE30_NORTH_STOPS = ["Aksarben T.C.","67th & Mercy","67th & Center","Saddle Creek & Center","Saddle Creek & Farnam","42nd & Farnam","42nd & Dodge","30th & Dodge","North Omaha T.C.","31st & Ames","31st & Ferry"];
+const ROUTE30_SOUTH: [number, number][] = [
+  [-95.9562,41.3040],[-95.9580,41.2992],[-95.9562,41.2962],[-95.9560,41.2597],
+  [-95.9772,41.2597],[-95.9772,41.2572],[-95.9961,41.2572],[-95.9967,41.2330],
+  [-96.0240,41.2329],[-96.0237,41.2395],[-96.0146,41.23883],
+];
+const ROUTE30_SOUTH_STOPS = ["31st & Ferry","31st & Ames","North Omaha T.C.","30th & Dodge","42nd & Dodge","42nd & Farnam","Saddle Creek & Farnam","Saddle Creek & Center","72nd & Center","72nd access & Mercy","Aksarben T.C."];
+
 declare global {
   interface Window { mapboxgl?: any; __routeTrainerWatch?: number; }
 }
@@ -55,10 +68,13 @@ function miles(a: [number, number], b: [number, number]) {
 async function mountLiveMap(host: HTMLElement) {
   if (host.dataset.enhanced) return;
   host.dataset.enhanced = "true";
-  const checkpoints = host.dataset.direction === "eastbound" ? [...WESTBOUND].reverse() : WESTBOUND;
+  const routeNumber = host.dataset.route || "11";
+  const route30South = routeNumber === "30" && host.dataset.direction === "southbound";
+  const checkpoints = routeNumber === "30" ? (route30South ? ROUTE30_SOUTH : ROUTE30_NORTH) : (host.dataset.direction === "eastbound" ? [...WESTBOUND].reverse() : WESTBOUND);
+  const checkpointNames = routeNumber === "30" ? (route30South ? ROUTE30_SOUTH_STOPS : ROUTE30_NORTH_STOPS) : (host.dataset.direction === "eastbound" ? [...WESTBOUND_STOPS].reverse() : WESTBOUND_STOPS);
   const fallback = document.createElement("canvas");
   fallback.className = "route-canvas";
-  fallback.setAttribute("aria-label", "Route 11 path from downtown Omaha to Aksarben Transit Center");
+  fallback.setAttribute("aria-label", `Route ${routeNumber} path`);
   host.prepend(fallback);
   const drawFallback = () => {
     const ratio = Math.min(window.devicePixelRatio || 1, 2), rect = host.getBoundingClientRect();
@@ -86,22 +102,21 @@ async function mountLiveMap(host: HTMLElement) {
     map.dragPan.enable(); map.scrollZoom.enable(); map.touchZoomRotate.enable(); map.doubleClickZoom.enable();
     const busEl = document.createElement("div");
     busEl.className = "gps-bus-marker";
-    busEl.innerHTML = "<span>11</span><small>START</small>";
+    busEl.innerHTML = `<span>${routeNumber}</span><small>START</small>`;
     const marker = new mapboxgl.Marker({ element: busEl, anchor: "center" }).setLngLat(checkpoints[0]).addTo(map);
     map.on("load", async () => {
       const routeData = { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: checkpoints } };
-      const stopData = { type: "FeatureCollection", features: checkpoints.map((coordinates, i) => ({ type: "Feature", properties: { name: (host.dataset.direction === "eastbound" ? [...WESTBOUND_STOPS].reverse() : WESTBOUND_STOPS)[i], number: i + 1 }, geometry: { type: "Point", coordinates } })) };
+      const stopData = { type: "FeatureCollection", features: checkpoints.map((coordinates, i) => ({ type: "Feature", properties: { name: checkpointNames[i], number: i + 1 }, geometry: { type: "Point", coordinates } })) };
       map.addSource("route-11", { type: "geojson", data: routeData });
       map.addLayer({ id: "route-11-outline", type: "line", source: "route-11", paint: { "line-color": "#17263a", "line-width": 11, "line-opacity": .95 } });
       map.addLayer({ id: "route-11-line", type: "line", source: "route-11", paint: { "line-color": "#efb81d", "line-width": 6 } });
       map.addSource("route-11-stops", { type: "geojson", data: stopData });
       map.addLayer({ id: "route-11-stop-dots", type: "circle", source: "route-11-stops", paint: { "circle-radius": 7, "circle-color": "#ffffff", "circle-stroke-color": "#17263a", "circle-stroke-width": 3 } });
       map.addLayer({ id: "route-11-stop-labels", type: "symbol", source: "route-11-stops", minzoom: 11.2, layout: { "text-field": ["get", "name"], "text-size": 11, "text-offset": [0, 1.25], "text-anchor": "top", "text-allow-overlap": false }, paint: { "text-color": "#17263a", "text-halo-color": "#ffffff", "text-halo-width": 2 } });
-      const stopNames = host.dataset.direction === "eastbound" ? [...WESTBOUND_STOPS].reverse() : WESTBOUND_STOPS;
       checkpoints.forEach((point, i) => {
         const stopEl = document.createElement("button");
         stopEl.className = `route-stop-marker ${i === 0 ? "start" : i === checkpoints.length - 1 ? "finish" : ""}`;
-        stopEl.type = "button"; stopEl.title = stopNames[i]; stopEl.setAttribute("aria-label", `Stop ${i + 1}: ${stopNames[i]}`); stopEl.textContent = String(i + 1);
+        stopEl.type = "button"; stopEl.title = checkpointNames[i]; stopEl.setAttribute("aria-label", `Checkpoint ${i + 1}: ${checkpointNames[i]}`); stopEl.textContent = String(i + 1);
         new mapboxgl.Marker({ element: stopEl, anchor: "center" }).setLngLat(point).addTo(map);
       });
       host.dataset.mapReady = "true";
