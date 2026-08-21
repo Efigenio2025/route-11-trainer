@@ -24,18 +24,72 @@ const WESTBOUND_STOPS = [
   "67th & Pine", "Aksarben Drive", "Mercy Road", "Aksarben T.C.",
 ];
 
-const ROUTE30_NORTH: [number, number][] = [
-  [-96.0146,41.23883],[-96.0155,41.2329],[-95.9967,41.2330],[-95.9961,41.2572],
-  [-95.9772,41.2572],[-95.9772,41.2597],[-95.9560,41.2597],[-95.9562,41.2962],
-  [-95.9580,41.2992],[-95.9562,41.3040],
+type MapPoint = { name: string; coordinates: [number, number] };
+
+// Route 30 maneuver points come from the turn-direction sheet. These shape
+// the route and drive guidance; they are deliberately not labeled as stops.
+const ROUTE30_NORTH_TURNS: MapPoint[] = [
+  {name:"Continue east on Mercy Road",coordinates:[-96.0146,41.23883]},
+  {name:"Right on 67th Street",coordinates:[-96.0155,41.2395]},
+  {name:"Right on 67th to Center",coordinates:[-96.0155,41.2329]},
+  {name:"Left on Center to Saddle Creek",coordinates:[-95.9967,41.2330]},
+  {name:"Left on Saddle Creek to Farnam",coordinates:[-95.9961,41.2572]},
+  {name:"Right on Farnam to 42nd",coordinates:[-95.9772,41.2572]},
+  {name:"Left on 42nd to Dodge",coordinates:[-95.9772,41.2597]},
+  {name:"Right on Dodge / Douglas",coordinates:[-95.9680,41.2597]},
+  {name:"Left on Park Avenue",coordinates:[-95.9567,41.2552]},
+  {name:"Left on Dodge to 30th",coordinates:[-95.9567,41.2597]},
+  {name:"Right on 30th to North Omaha T.C.",coordinates:[-95.9562,41.2962]},
+  {name:"North Omaha T.C. layover",coordinates:[-95.9562,41.2972]},
+  {name:"Exit to 31st Avenue",coordinates:[-95.9580,41.2992]},
+  {name:"Right on 31st Avenue to Ames",coordinates:[-95.9580,41.3000]},
+  {name:"Right on Ames to 30th",coordinates:[-95.9562,41.3000]},
+  {name:"Left on 30th, right on Ferry",coordinates:[-95.9580,41.3040]},
 ];
-const ROUTE30_NORTH_STOPS = ["22nd & Cuming","Aksarben T.C.","Saddle Creek & Leavenworth","42nd & Dodge","30th & Dodge","30th & Cuming","Arrive NOTC","Depart NOTC","30th & Martin","31st & Ferry"];
-const ROUTE30_SOUTH: [number, number][] = [
-  [-95.9562,41.3040],[-95.9580,41.2992],[-95.9562,41.2962],[-95.9560,41.2597],
-  [-95.9772,41.2597],[-95.9772,41.2572],[-95.9961,41.2572],[-95.9967,41.2330],
-  [-96.0237,41.2395],[-96.0146,41.23883],
+const ROUTE30_SOUTH_TURNS: MapPoint[] = [
+  {name:"Exit turn-around to Ferry",coordinates:[-95.9580,41.3040]},
+  {name:"Left on Ferry to 31st",coordinates:[-95.9580,41.3035]},
+  {name:"Left on 31st / 30th to Ames",coordinates:[-95.9562,41.3000]},
+  {name:"Right on Ames to 31st Avenue",coordinates:[-95.9580,41.3000]},
+  {name:"Left on 31st Avenue to North Omaha T.C.",coordinates:[-95.9580,41.2972]},
+  {name:"North Omaha T.C. layover",coordinates:[-95.9562,41.2972]},
+  {name:"Exit North Omaha T.C. to 30th",coordinates:[-95.9562,41.2962]},
+  {name:"Right on 30th / Turner to Dodge",coordinates:[-95.9562,41.2597]},
+  {name:"Right on Dodge to 42nd access road",coordinates:[-95.9772,41.2597]},
+  {name:"42nd Street jug-handle",coordinates:[-95.9772,41.2587]},
+  {name:"Left on 42nd to Farnam",coordinates:[-95.9772,41.2572]},
+  {name:"Right on Farnam to Saddle Creek",coordinates:[-95.9961,41.2572]},
+  {name:"Left on Saddle Creek to Center",coordinates:[-95.9967,41.2330]},
+  {name:"Right on Center to 72nd access",coordinates:[-96.0237,41.2330]},
+  {name:"Left on access road to Mercy",coordinates:[-96.0237,41.2395]},
+  {name:"Right on Mercy to Aksarben T.C.",coordinates:[-96.0146,41.23883]},
 ];
-const ROUTE30_SOUTH_STOPS = ["31st & Ferry","30th & Martin","Arrive NOTC","Depart NOTC","30th & Cuming","Turner Blvd & Dodge","42nd & Dodge","Saddle Creek & Leavenworth","Aksarben T.C.","22nd & Cuming"];
+
+// These are the timetable timepoints/stops, kept separate from maneuvers.
+const ROUTE30_NORTH_STOPS: MapPoint[] = [
+  {name:"22nd & Cuming",coordinates:[-95.9430,41.2672]},
+  {name:"Aksarben T.C.",coordinates:[-96.0146,41.23883]},
+  {name:"Saddle Creek & Leavenworth",coordinates:[-95.9965,41.2524]},
+  {name:"42nd & Dodge",coordinates:[-95.9772,41.2597]},
+  {name:"30th & Dodge",coordinates:[-95.9562,41.2597]},
+  {name:"30th & Cuming",coordinates:[-95.9562,41.2672]},
+  {name:"Arrive NOTC",coordinates:[-95.9562,41.2962]},
+  {name:"Depart NOTC",coordinates:[-95.9562,41.2972]},
+  {name:"30th & Martin",coordinates:[-95.9562,41.2992]},
+  {name:"31st & Ferry",coordinates:[-95.9580,41.3040]},
+];
+const ROUTE30_SOUTH_STOPS: MapPoint[] = [
+  {name:"31st & Ferry",coordinates:[-95.9580,41.3040]},
+  {name:"30th & Martin",coordinates:[-95.9562,41.2992]},
+  {name:"Arrive NOTC",coordinates:[-95.9562,41.2972]},
+  {name:"Depart NOTC",coordinates:[-95.9562,41.2962]},
+  {name:"30th & Cuming",coordinates:[-95.9562,41.2672]},
+  {name:"Turner Blvd & Dodge",coordinates:[-95.9680,41.2597]},
+  {name:"42nd & Dodge",coordinates:[-95.9772,41.2597]},
+  {name:"Saddle Creek & Leavenworth",coordinates:[-95.9965,41.2524]},
+  {name:"Aksarben T.C.",coordinates:[-96.0146,41.23883]},
+  {name:"22nd & Cuming",coordinates:[-95.9430,41.2672]},
+];
 
 declare global {
   interface Window { mapboxgl?: any; __routeTrainerWatch?: number; __startRouteGPS?: () => void; }
@@ -73,8 +127,13 @@ async function mountLiveMap(host: HTMLElement) {
   host.dataset.enhanced = "true";
   const routeNumber = host.dataset.route || "11";
   const route30South = routeNumber === "30" && host.dataset.direction === "southbound";
-  const checkpoints = routeNumber === "30" ? (route30South ? ROUTE30_SOUTH : ROUTE30_NORTH) : (host.dataset.direction === "eastbound" ? [...WESTBOUND].reverse() : WESTBOUND);
-  const checkpointNames = routeNumber === "30" ? (route30South ? ROUTE30_SOUTH_STOPS : ROUTE30_NORTH_STOPS) : (host.dataset.direction === "eastbound" ? [...WESTBOUND_STOPS].reverse() : WESTBOUND_STOPS);
+  const route30Turns = route30South ? ROUTE30_SOUTH_TURNS : ROUTE30_NORTH_TURNS;
+  const route30Stops = route30South ? ROUTE30_SOUTH_STOPS : ROUTE30_NORTH_STOPS;
+  const checkpoints = routeNumber === "30" ? route30Turns.map(point => point.coordinates) : (host.dataset.direction === "eastbound" ? [...WESTBOUND].reverse() : WESTBOUND);
+  const checkpointNames = routeNumber === "30" ? route30Turns.map(point => point.name) : (host.dataset.direction === "eastbound" ? [...WESTBOUND_STOPS].reverse() : WESTBOUND_STOPS);
+  const stops: MapPoint[] = routeNumber === "30"
+    ? route30Stops
+    : checkpoints.map((coordinates, index) => ({ name: checkpointNames[index], coordinates }));
   const fallback = document.createElement("canvas");
   fallback.className = "route-canvas";
   fallback.setAttribute("aria-label", `Route ${routeNumber} path`);
@@ -120,18 +179,23 @@ async function mountLiveMap(host: HTMLElement) {
     centerButton.onclick = () => map.easeTo({ center: busPosition, zoom: Math.max(map.getZoom(), 14.5), duration: 500 });
     map.on("load", async () => {
       const routeData = { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: checkpoints } };
-      const stopData = { type: "FeatureCollection", features: checkpoints.map((coordinates, i) => ({ type: "Feature", properties: { name: checkpointNames[i], number: i + 1 }, geometry: { type: "Point", coordinates } })) };
+      const stopData = { type: "FeatureCollection", features: stops.map((stop, i) => ({ type: "Feature", properties: { name: stop.name, number: i + 1 }, geometry: { type: "Point", coordinates: stop.coordinates } })) };
+      const turnData = { type: "FeatureCollection", features: routeNumber === "30" ? route30Turns.map((turn, i) => ({ type: "Feature", properties: { name: turn.name, number: i + 1 }, geometry: { type: "Point", coordinates: turn.coordinates } })) : [] };
       map.addSource("route-11", { type: "geojson", data: routeData });
       map.addLayer({ id: "route-11-outline", type: "line", source: "route-11", paint: { "line-color": "#17263a", "line-width": 7, "line-opacity": .8 } });
       map.addLayer({ id: "route-11-line", type: "line", source: "route-11", paint: { "line-color": "#efb81d", "line-width": 4 } });
       map.addSource("route-11-stops", { type: "geojson", data: stopData });
       map.addLayer({ id: "route-11-stop-dots", type: "circle", source: "route-11-stops", paint: { "circle-radius": 7, "circle-color": "#ffffff", "circle-stroke-color": "#17263a", "circle-stroke-width": 3 } });
       map.addLayer({ id: "route-11-stop-labels", type: "symbol", source: "route-11-stops", layout: { "text-field": ["get", "name"], "text-size": 11, "text-offset": [0, 1.25], "text-anchor": "top", "text-allow-overlap": true, "text-ignore-placement": true }, paint: { "text-color": "#17263a", "text-halo-color": "#ffffff", "text-halo-width": 2 } });
-      checkpoints.forEach((point, i) => {
+      if (routeNumber === "30") {
+        map.addSource("route-30-turns", { type: "geojson", data: turnData });
+        map.addLayer({ id: "route-30-turn-dots", type: "circle", source: "route-30-turns", paint: { "circle-radius": 4, "circle-color": "#efb81d", "circle-stroke-color": "#17263a", "circle-stroke-width": 2 } });
+      }
+      stops.forEach((stop, i) => {
         const stopEl = document.createElement("button");
-        stopEl.className = `route-stop-marker ${i === 0 ? "start" : i === checkpoints.length - 1 ? "finish" : ""}`;
-        stopEl.type = "button"; stopEl.title = checkpointNames[i]; stopEl.setAttribute("aria-label", `Stop ${i + 1}: ${checkpointNames[i]}`); stopEl.innerHTML = `<span>${i + 1}</span><small>${checkpointNames[i]}</small>`;
-        new mapboxgl.Marker({ element: stopEl, anchor: "center" }).setLngLat(point).addTo(map);
+        stopEl.className = `route-stop-marker ${i === 0 ? "start" : i === stops.length - 1 ? "finish" : ""}`;
+        stopEl.type = "button"; stopEl.title = stop.name; stopEl.setAttribute("aria-label", `Stop ${i + 1}: ${stop.name}`); stopEl.innerHTML = `<span>${i + 1}</span><small>${stop.name}</small>`;
+        new mapboxgl.Marker({ element: stopEl, anchor: "center" }).setLngLat(stop.coordinates).addTo(map);
       });
       host.dataset.mapReady = "true";
       try {
