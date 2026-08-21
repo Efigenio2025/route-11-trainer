@@ -113,11 +113,10 @@ async function mountLiveMap(host: HTMLElement) {
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false, visualizePitch: false }), "bottom-right");
     map.dragPan.enable(); map.scrollZoom.enable(); map.touchZoomRotate.enable(); map.doubleClickZoom.enable();
     let busPosition: [number, number] = checkpoints[0];
-    const busEl = document.createElement("div");
-    busEl.className = "avl-bus-pin";
-    busEl.setAttribute("aria-label", `Route ${routeNumber} bus location`);
-    busEl.innerHTML = "<span aria-hidden=\"true\">🚌</span>";
-    const busMarker = new mapboxgl.Marker({ element: busEl, anchor: "center" }).setLngLat(busPosition).addTo(map);
+    const busMarker = new mapboxgl.Marker({ color: "#17263a", scale: 0.85 })
+      .setLngLat(busPosition)
+      .setPopup(new mapboxgl.Popup({ offset: 24 }).setText(`Route ${routeNumber} bus location`))
+      .addTo(map);
     centerButton.onclick = () => map.easeTo({ center: busPosition, zoom: Math.max(map.getZoom(), 14.5), duration: 500 });
     map.on("load", async () => {
       const routeData = { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: checkpoints } };
@@ -150,7 +149,7 @@ async function mountLiveMap(host: HTMLElement) {
       if (window.__routeTrainerWatch != null) navigator.geolocation.clearWatch(window.__routeTrainerWatch);
       window.__routeTrainerWatch = navigator.geolocation.watchPosition(position => {
         const current: [number, number] = [position.coords.longitude, position.coords.latitude];
-        busPosition = current; busMarker.setLngLat(current); busEl.classList.add("live"); map.easeTo({ center: current, zoom: 15.5, duration: 700 });
+        busPosition = current; busMarker.setLngLat(current); map.easeTo({ center: current, zoom: 15.5, duration: 700 });
         const nearest = checkpoints.map((p, i) => ({ i, d: miles(current, p) })).sort((a, b) => a.d - b.d)[0];
         const status = document.querySelector<HTMLElement>(".live-status span");
         const distance = document.querySelector<HTMLElement>(".next b");
