@@ -1,3 +1,19 @@
-.map{touch-action:auto;overflow:hidden}.mapbox-canvas{z-index:3;touch-action:pan-x pan-y}.mapboxgl-canvas{touch-action:pan-x pan-y}.route-stop-marker{width:28px;height:28px;font-size:9px}
-.route-stop-marker{position:relative;width:24px;height:24px;overflow:visible}.route-stop-marker span{display:grid;place-items:center;width:100%;height:100%}.route-stop-marker small{position:absolute;left:50%;top:27px;transform:translateX(-50%);white-space:nowrap;background:#fff;padding:3px 5px;border-radius:4px;font-size:9px;font-weight:800;color:#17263a;box-shadow:0 1px 5px #17263a44;pointer-events:none}
+.map{background-color:#d9d7d1;touch-action:auto;overflow:hidden}
+.route-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:2;filter:drop-shadow(0 3px 3px #17263a33);pointer-events:none}
+.mapbox-canvas{position:absolute;inset:0;z-index:3;opacity:0;transition:opacity .25s;touch-action:pan-x pan-y}
+.map[data-map-ready=true] .mapbox-canvas{opacity:1}
+.map[data-map-ready=true]>.route-canvas,.map[data-map-ready=true]>.road,.map[data-map-ready=true]>.route-line,.map[data-map-ready=true]>.bus,.map[data-map-ready=true]>.street{display:none!important}
+.map .street{background:#ffffffe6;padding:3px 5px;border-radius:4px;font-weight:800;z-index:2}
+.map>.road{opacity:.22}.map>.route-line,.map>.bus{z-index:2}.map label{z-index:4;pointer-events:none}
+.gps-button{position:absolute;z-index:8;right:14px;top:14px;border:0;border-radius:10px;background:#17263a;color:#fff;padding:10px 12px;font-size:11px;font-weight:900;box-shadow:0 4px 12px #17263a33}
+.mapboxgl-marker{z-index:5}.mapboxgl-canvas{touch-action:pan-x pan-y}
+.route-stop-marker{position:relative;width:24px;height:24px;border-radius:50%;border:3px solid #17263a;background:#fff;color:#17263a;padding:0;display:grid;place-items:center;font-size:8px;font-weight:900;box-shadow:0 2px 6px #17263a55;overflow:visible}
+.route-stop-marker.start{background:#68d391}.route-stop-marker.finish{background:#efb81d}
+.route-stop-marker span{display:grid;place-items:center;width:100%;height:100%}
+.route-stop-marker small{position:absolute;left:50%;top:27px;transform:translateX(-50%);white-space:nowrap;background:#fff;padding:3px 5px;border-radius:4px;font-size:9px;font-weight:800;color:#17263a;box-shadow:0 1px 5px #17263a44;pointer-events:none}
+.avl-bus-pin{box-sizing:border-box!important;width:42px!important;height:42px!important;min-width:42px!important;max-width:42px!important;border:4px solid #fff!important;border-radius:50%!important;background:#17263a!important;box-shadow:0 4px 14px #17263a99!important;display:grid!important;place-items:center!important;overflow:hidden!important;pointer-events:none!important}
+.avl-bus-pin span{display:block!important;font-size:23px!important;line-height:1!important;width:auto!important;height:auto!important;transform:none!important}.avl-bus-pin.live{outline:3px solid #efb81d;outline-offset:2px}
+.mapboxgl-ctrl-bottom-right{z-index:8;bottom:28px!important}.mapboxgl-ctrl-group{border-radius:10px!important;overflow:hidden;box-shadow:0 3px 12px #17263a44!important}.mapboxgl-ctrl-bottom-left{z-index:2}.mapboxgl-ctrl-attrib{font-size:9px!important}
+.speech-toggle{display:grid!important;place-items:center;background:#ffffff18!important;font-size:18px!important}.speech-toggle.on{box-shadow:0 0 0 2px #efb81d}
+.voice-state{display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding:10px 12px;border-radius:10px;background:#f5f0e2;font-size:12px;font-weight:800}.voice-state button{border:0;border-radius:8px;background:#17263a;color:#fff;padding:8px 10px;font-size:11px;font-weight:900}
 
