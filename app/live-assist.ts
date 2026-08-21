@@ -286,7 +286,7 @@ async function mountLiveMap(host: HTMLElement) {
         if (distance) distance.textContent = `${maneuverDistance < .1 ? Math.round(maneuverDistance * 5280) + " ft" : maneuverDistance.toFixed(1) + " mi"}`;
         if (onRoute && promptStage < 1 && maneuverDistance <= .35) { promptStage = 1; gpsEvent({type:"prepare", index:targetIndex, distance:maneuverDistance}); }
         if (onRoute && promptStage < 2 && maneuverDistance <= .10) { promptStage = 2; gpsEvent({type:"near", index:targetIndex, distance:maneuverDistance}); }
-        if (onRoute && nearestStop.distance <= 150 / 5280 && !announcedStops.has(nearestStop.i)) {
+        if (onRoute && nearestStop.distance <= 300 / 5280 && !announcedStops.has(nearestStop.i)) {
           announcedStops.add(nearestStop.i);
           gpsEvent({type:"stop-ahead", stopName:nearestStop.stop.name, distanceFeet:Math.round(nearestStop.distance * 5280)});
         }
