@@ -81,10 +81,12 @@ async function mountLiveMap(host: HTMLElement) {
   try {
     const mapboxgl = await loadMapbox();
     mapboxgl.accessToken = TOKEN;
-    const map = new mapboxgl.Map({ container: mapNode, style: "mapbox://styles/mapbox/streets-v12", center: [-95.974, 41.251], zoom: 11.7, attributionControl: true });
+    const map = new mapboxgl.Map({ container: mapNode, style: "mapbox://styles/mapbox/streets-v12", center: [-95.974, 41.251], zoom: 11.7, attributionControl: true, interactive: true, dragPan: true, scrollZoom: true, touchZoomRotate: true, doubleClickZoom: true });
+    map.addControl(new mapboxgl.NavigationControl({ showCompass: false, visualizePitch: false }), "bottom-right");
+    map.dragPan.enable(); map.scrollZoom.enable(); map.touchZoomRotate.enable(); map.doubleClickZoom.enable();
     const busEl = document.createElement("div");
     busEl.className = "gps-bus-marker";
-    busEl.innerHTML = "<span>11</span><small>YOU</small>";
+    busEl.innerHTML = "<span>11</span><small>START</small>";
     const marker = new mapboxgl.Marker({ element: busEl, anchor: "center" }).setLngLat(checkpoints[0]).addTo(map);
     map.on("load", async () => {
       const routeData = { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: checkpoints } };
@@ -94,7 +96,14 @@ async function mountLiveMap(host: HTMLElement) {
       map.addLayer({ id: "route-11-line", type: "line", source: "route-11", paint: { "line-color": "#efb81d", "line-width": 6 } });
       map.addSource("route-11-stops", { type: "geojson", data: stopData });
       map.addLayer({ id: "route-11-stop-dots", type: "circle", source: "route-11-stops", paint: { "circle-radius": 7, "circle-color": "#ffffff", "circle-stroke-color": "#17263a", "circle-stroke-width": 3 } });
-      map.addLayer({ id: "route-11-stop-labels", type: "symbol", source: "route-11-stops", minzoom: 12.4, layout: { "text-field": ["get", "name"], "text-size": 11, "text-offset": [0, 1.25], "text-anchor": "top", "text-allow-overlap": false }, paint: { "text-color": "#17263a", "text-halo-color": "#ffffff", "text-halo-width": 2 } });
+      map.addLayer({ id: "route-11-stop-labels", type: "symbol", source: "route-11-stops", minzoom: 11.2, layout: { "text-field": ["get", "name"], "text-size": 11, "text-offset": [0, 1.25], "text-anchor": "top", "text-allow-overlap": false }, paint: { "text-color": "#17263a", "text-halo-color": "#ffffff", "text-halo-width": 2 } });
+      const stopNames = host.dataset.direction === "eastbound" ? [...WESTBOUND_STOPS].reverse() : WESTBOUND_STOPS;
+      checkpoints.forEach((point, i) => {
+        const stopEl = document.createElement("button");
+        stopEl.className = `route-stop-marker ${i === 0 ? "start" : i === checkpoints.length - 1 ? "finish" : ""}`;
+        stopEl.type = "button"; stopEl.title = stopNames[i]; stopEl.setAttribute("aria-label", `Stop ${i + 1}: ${stopNames[i]}`); stopEl.textContent = String(i + 1);
+        new mapboxgl.Marker({ element: stopEl, anchor: "center" }).setLngLat(point).addTo(map);
+      });
       host.dataset.mapReady = "true";
       try {
         const points = checkpoints.map(p => p.join(",")).join(";");
@@ -111,7 +120,7 @@ async function mountLiveMap(host: HTMLElement) {
       if (window.__routeTrainerWatch != null) navigator.geolocation.clearWatch(window.__routeTrainerWatch);
       window.__routeTrainerWatch = navigator.geolocation.watchPosition(position => {
         const current: [number, number] = [position.coords.longitude, position.coords.latitude];
-        marker.setLngLat(current); busEl.classList.add("live"); map.easeTo({ center: current, zoom: 15.5, duration: 700 });
+        marker.setLngLat(current); busEl.classList.add("live"); busEl.querySelector("small")!.textContent = "YOU"; map.easeTo({ center: current, zoom: 15.5, duration: 700 });
         const nearest = checkpoints.map((p, i) => ({ i, d: miles(current, p) })).sort((a, b) => a.d - b.d)[0];
         const status = document.querySelector<HTMLElement>(".live-status span");
         const distance = document.querySelector<HTMLElement>(".next b");
