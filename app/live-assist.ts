@@ -65,32 +65,6 @@ const ROUTE30_SOUTH_TURNS: MapPoint[] = [
   {name:"Right on Mercy to Aksarben T.C.",coordinates:[-96.0146,41.23883]},
 ];
 
-// These are the timetable timepoints/stops, kept separate from maneuvers.
-const ROUTE30_NORTH_STOPS: MapPoint[] = [
-  {name:"22nd & Cuming",coordinates:[-95.9430,41.2672]},
-  {name:"Aksarben T.C.",coordinates:[-96.0146,41.23883]},
-  {name:"Saddle Creek & Leavenworth",coordinates:[-95.9965,41.2524]},
-  {name:"42nd & Dodge",coordinates:[-95.9772,41.2597]},
-  {name:"30th & Dodge",coordinates:[-95.9562,41.2597]},
-  {name:"30th & Cuming",coordinates:[-95.9562,41.2672]},
-  {name:"Arrive NOTC",coordinates:[-95.9562,41.2962]},
-  {name:"Depart NOTC",coordinates:[-95.9562,41.2972]},
-  {name:"30th & Martin",coordinates:[-95.9562,41.2992]},
-  {name:"31st & Ferry",coordinates:[-95.9580,41.3040]},
-];
-const ROUTE30_SOUTH_STOPS: MapPoint[] = [
-  {name:"31st & Ferry",coordinates:[-95.9580,41.3040]},
-  {name:"30th & Martin",coordinates:[-95.9562,41.2992]},
-  {name:"Arrive NOTC",coordinates:[-95.9562,41.2972]},
-  {name:"Depart NOTC",coordinates:[-95.9562,41.2962]},
-  {name:"30th & Cuming",coordinates:[-95.9562,41.2672]},
-  {name:"Turner Blvd & Dodge",coordinates:[-95.9680,41.2597]},
-  {name:"42nd & Dodge",coordinates:[-95.9772,41.2597]},
-  {name:"Saddle Creek & Leavenworth",coordinates:[-95.9965,41.2524]},
-  {name:"Aksarben T.C.",coordinates:[-96.0146,41.23883]},
-  {name:"22nd & Cuming",coordinates:[-95.9430,41.2672]},
-];
-
 declare global {
   interface Window { mapboxgl?: any; __routeTrainerWatch?: number; __startRouteGPS?: () => void; }
 }
@@ -128,8 +102,10 @@ async function mountLiveMap(host: HTMLElement) {
   const routeNumber = host.dataset.route || "11";
   const route30South = routeNumber === "30" && host.dataset.direction === "southbound";
   const route30Turns = route30South ? ROUTE30_SOUTH_TURNS : ROUTE30_NORTH_TURNS;
-  const route30Stops = route30South ? ROUTE30_SOUTH_STOPS : ROUTE30_NORTH_STOPS;
+  const route30Stops = route30South ? OFFICIAL_ROUTE30_SOUTH_STOPS : OFFICIAL_ROUTE30_NORTH_STOPS;
+  const route30Shape = route30South ? ROUTE30_SOUTH_SHAPE : ROUTE30_NORTH_SHAPE;
   const checkpoints = routeNumber === "30" ? route30Turns.map(point => point.coordinates) : (host.dataset.direction === "eastbound" ? [...WESTBOUND].reverse() : WESTBOUND);
+  const mapCoordinates = routeNumber === "30" ? route30Shape : checkpoints;
   const checkpointNames = routeNumber === "30" ? route30Turns.map(point => point.name) : (host.dataset.direction === "eastbound" ? [...WESTBOUND_STOPS].reverse() : WESTBOUND_STOPS);
   const stops: MapPoint[] = routeNumber === "30"
     ? route30Stops
@@ -142,9 +118,9 @@ async function mountLiveMap(host: HTMLElement) {
     const ratio = Math.min(window.devicePixelRatio || 1, 2), rect = host.getBoundingClientRect();
     fallback.width = Math.max(1, Math.round(rect.width * ratio)); fallback.height = Math.max(1, Math.round(rect.height * ratio));
     const ctx = fallback.getContext("2d"); if (!ctx) return; ctx.scale(ratio, ratio);
-    const pad = 34, minX = Math.min(...checkpoints.map(p => p[0])), maxX = Math.max(...checkpoints.map(p => p[0])), minY = Math.min(...checkpoints.map(p => p[1])), maxY = Math.max(...checkpoints.map(p => p[1]));
+    const pad = 34, minX = Math.min(...mapCoordinates.map(p => p[0])), maxX = Math.max(...mapCoordinates.map(p => p[0])), minY = Math.min(...mapCoordinates.map(p => p[1])), maxY = Math.max(...mapCoordinates.map(p => p[1]));
     const point = (p: [number, number]) => [pad + (p[0]-minX)/(maxX-minX)*(rect.width-pad*2), pad + (maxY-p[1])/(maxY-minY)*(rect.height-pad*2)] as const;
-    const paint = (color:string,width:number) => {ctx.beginPath();checkpoints.forEach((p,i)=>{const [x,y]=point(p);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.strokeStyle=color;ctx.lineWidth=width;ctx.lineJoin="round";ctx.lineCap="round";ctx.stroke()};
+    const paint = (color:string,width:number) => {ctx.beginPath();mapCoordinates.forEach((p,i)=>{const [x,y]=point(p);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.strokeStyle=color;ctx.lineWidth=width;ctx.lineJoin="round";ctx.lineCap="round";ctx.stroke()};
     paint("#17263a",7); paint("#efb81d",4);
     checkpoints.forEach((p,i)=>{const[x,y]=point(p);ctx.beginPath();ctx.arc(x,y,i===0||i===checkpoints.length-1?7:4,0,Math.PI*2);ctx.fillStyle=i===0?"#148b63":i===checkpoints.length-1?"#d65572":"#fff";ctx.fill();ctx.strokeStyle="#17263a";ctx.lineWidth=2;ctx.stroke()});
   };
@@ -171,14 +147,14 @@ async function mountLiveMap(host: HTMLElement) {
     const map = new mapboxgl.Map({ container: mapNode, style: "mapbox://styles/mapbox/streets-v12", center: [-95.974, 41.251], zoom: 11.7, attributionControl: true, interactive: true, dragPan: true, scrollZoom: true, touchZoomRotate: true, doubleClickZoom: true });
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false, visualizePitch: false }), "bottom-right");
     map.dragPan.enable(); map.scrollZoom.enable(); map.touchZoomRotate.enable(); map.doubleClickZoom.enable();
-    let busPosition: [number, number] = checkpoints[0];
+    let busPosition: [number, number] = mapCoordinates[0];
     const busMarker = new mapboxgl.Marker({ color: "#17263a", scale: 0.85 })
       .setLngLat(busPosition)
       .setPopup(new mapboxgl.Popup({ offset: 24 }).setText(`Route ${routeNumber} bus location`))
       .addTo(map);
     centerButton.onclick = () => map.easeTo({ center: busPosition, zoom: Math.max(map.getZoom(), 14.5), duration: 500 });
     map.on("load", async () => {
-      const routeData = { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: checkpoints } };
+      const routeData = { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: mapCoordinates } };
       const stopData = { type: "FeatureCollection", features: stops.map((stop, i) => ({ type: "Feature", properties: { name: stop.name, number: i + 1 }, geometry: { type: "Point", coordinates: stop.coordinates } })) };
       const turnData = { type: "FeatureCollection", features: routeNumber === "30" ? route30Turns.map((turn, i) => ({ type: "Feature", properties: { name: turn.name, number: i + 1 }, geometry: { type: "Point", coordinates: turn.coordinates } })) : [] };
       map.addSource("route-11", { type: "geojson", data: routeData });
@@ -186,32 +162,42 @@ async function mountLiveMap(host: HTMLElement) {
       map.addLayer({ id: "route-11-line", type: "line", source: "route-11", paint: { "line-color": "#efb81d", "line-width": 4 } });
       map.addSource("route-11-stops", { type: "geojson", data: stopData });
       map.addLayer({ id: "route-11-stop-dots", type: "circle", source: "route-11-stops", paint: { "circle-radius": 7, "circle-color": "#ffffff", "circle-stroke-color": "#17263a", "circle-stroke-width": 3 } });
-      map.addLayer({ id: "route-11-stop-labels", type: "symbol", source: "route-11-stops", layout: { "text-field": ["get", "name"], "text-size": 11, "text-offset": [0, 1.25], "text-anchor": "top", "text-allow-overlap": true, "text-ignore-placement": true }, paint: { "text-color": "#17263a", "text-halo-color": "#ffffff", "text-halo-width": 2 } });
+      map.addLayer({ id: "route-11-stop-labels", type: "symbol", source: "route-11-stops", minzoom: 13, layout: { "text-field": ["get", "name"], "text-size": 11, "text-offset": [0, 1.25], "text-anchor": "top", "text-allow-overlap": false, "text-ignore-placement": false }, paint: { "text-color": "#17263a", "text-halo-color": "#ffffff", "text-halo-width": 2 } });
+      map.on("click", "route-11-stop-dots", (event: any) => {
+        const feature = event.features?.[0];
+        if (!feature) return;
+        new mapboxgl.Popup({ offset: 12 }).setLngLat(feature.geometry.coordinates).setText(`Stop ${feature.properties.number}: ${feature.properties.name}`).addTo(map);
+      });
+      map.on("mouseenter", "route-11-stop-dots", () => { map.getCanvas().style.cursor = "pointer"; });
+      map.on("mouseleave", "route-11-stop-dots", () => { map.getCanvas().style.cursor = ""; });
       if (routeNumber === "30") {
         map.addSource("route-30-turns", { type: "geojson", data: turnData });
         map.addLayer({ id: "route-30-turn-dots", type: "circle", source: "route-30-turns", paint: { "circle-radius": 4, "circle-color": "#efb81d", "circle-stroke-color": "#17263a", "circle-stroke-width": 2 } });
       }
       stops.forEach((stop, i) => {
+        if (routeNumber === "30" && i !== 0 && i !== stops.length - 1) return;
         const stopEl = document.createElement("button");
         stopEl.className = `route-stop-marker ${i === 0 ? "start" : i === stops.length - 1 ? "finish" : ""}`;
         stopEl.type = "button"; stopEl.title = stop.name; stopEl.setAttribute("aria-label", `Stop ${i + 1}: ${stop.name}`); stopEl.innerHTML = `<span>${i + 1}</span><small>${stop.name}</small>`;
         new mapboxgl.Marker({ element: stopEl, anchor: "center" }).setLngLat(stop.coordinates).addTo(map);
       });
       host.dataset.mapReady = "true";
-      try {
-        const legs = await Promise.all(checkpoints.slice(0, -1).map(async (from, index) => {
-          const to = checkpoints[index + 1];
-          const response = await fetch(`https://api.mapbox.com/directions/v5/mapbox/driving/${from.join(",")};${to.join(",")}?geometries=geojson&overview=full&steps=false&access_token=${TOKEN}`);
-          if (!response.ok) return [from, to] as [number, number][];
-          const data = await response.json();
-          return (data.routes?.[0]?.geometry?.coordinates || [from, to]) as [number, number][];
-        }));
-        const streetGeometry = legs.flatMap((leg, index) => index ? leg.slice(1) : leg);
-        if (streetGeometry.length > checkpoints.length) {
-          (map.getSource("route-11") as any).setData({ ...routeData, geometry: { type: "LineString", coordinates: streetGeometry } });
-        }
-      } catch { /* The checkpoint route is already visible. */ }
-      const bounds = checkpoints.reduce((b: any, p) => b.extend(p), new mapboxgl.LngLatBounds(checkpoints[0], checkpoints[0]));
+      if (routeNumber !== "30") {
+        try {
+          const legs = await Promise.all(checkpoints.slice(0, -1).map(async (from, index) => {
+            const to = checkpoints[index + 1];
+            const response = await fetch(`https://api.mapbox.com/directions/v5/mapbox/driving/${from.join(",")};${to.join(",")}?geometries=geojson&overview=full&steps=false&access_token=${TOKEN}`);
+            if (!response.ok) return [from, to] as [number, number][];
+            const data = await response.json();
+            return (data.routes?.[0]?.geometry?.coordinates || [from, to]) as [number, number][];
+          }));
+          const streetGeometry = legs.flatMap((leg, index) => index ? leg.slice(1) : leg);
+          if (streetGeometry.length > checkpoints.length) {
+            (map.getSource("route-11") as any).setData({ ...routeData, geometry: { type: "LineString", coordinates: streetGeometry } });
+          }
+        } catch { /* The checkpoint route is already visible. */ }
+      }
+      const bounds = mapCoordinates.reduce((b: any, p) => b.extend(p), new mapboxgl.LngLatBounds(mapCoordinates[0], mapCoordinates[0]));
       map.fitBounds(bounds, { padding: 45, duration: 0 });
     });
     const startGps = () => {
@@ -222,10 +208,11 @@ async function mountLiveMap(host: HTMLElement) {
         const current: [number, number] = [position.coords.longitude, position.coords.latitude];
         busPosition = current; busMarker.setLngLat(current); map.easeTo({ center: current, zoom: 15.5, duration: 700 });
         const nearest = checkpoints.map((p, i) => ({ i, d: miles(current, p) })).sort((a, b) => a.d - b.d)[0];
+        const routeDistance = Math.min(...mapCoordinates.map(point => miles(current, point)));
         const status = document.querySelector<HTMLElement>(".live-status span");
         const distance = document.querySelector<HTMLElement>(".next b");
         const routeTolerance = routeNumber === "30" ? .35 : .2;
-        if (status) { status.textContent = nearest.d < routeTolerance ? "ON ROUTE" : "OFF ROUTE"; status.className = nearest.d < routeTolerance ? "tracking" : "off-route"; }
+        if (status) { status.textContent = routeDistance < routeTolerance ? "ON ROUTE" : "OFF ROUTE"; status.className = routeDistance < routeTolerance ? "tracking" : "off-route"; }
         if (distance) distance.textContent = `${nearest.d < .1 ? Math.round(nearest.d * 5280) + " ft" : nearest.d.toFixed(1) + " mi"}`;
         const accuracy = document.querySelector<HTMLElement>(".avl-accuracy");
         const updated = document.querySelector<HTMLElement>(".avl-updated");
@@ -247,4 +234,10 @@ if (typeof window !== "undefined") {
   new MutationObserver(scan).observe(document.documentElement, { childList: true, subtree: true });
   queueMicrotask(scan);
 }
+import {
+  ROUTE30_NORTH_SHAPE,
+  ROUTE30_NORTH_STOPS as OFFICIAL_ROUTE30_NORTH_STOPS,
+  ROUTE30_SOUTH_SHAPE,
+  ROUTE30_SOUTH_STOPS as OFFICIAL_ROUTE30_SOUTH_STOPS,
+} from "./route30-official";
 
