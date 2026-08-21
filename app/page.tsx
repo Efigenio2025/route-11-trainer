@@ -79,6 +79,17 @@ const routes:Route[]=[
    {action:"continue",street:"16th Street",until:"Leavenworth Street"},
    {action:"continue",street:"16th Street",until:"Vinton Street"},
    {action:"continue",street:"Vinton Street",until:"32nd Avenue"}]}
+  ]},
+ {id:"26",number:"26",name:"North Omaha Circulator",subtitle:"Counterclockwise loop from North Omaha T.C.",directions:[
+  {id:"counterclockwise",label:"Counterclockwise",origin:"North Omaha T.C.",destination:"North Omaha T.C.",steps:[
+   {action:"continue",street:"30th Street and Ames Avenue",until:"24th Street"},
+   {action:"continue",street:"24th Street",until:"Titus Avenue"},
+   {action:"continue",street:"Minne Lusa Boulevard",until:"Martin Avenue"},
+   {action:"continue",street:"Martin Avenue",until:"Redick Avenue"},
+   {action:"continue",street:"Redick Avenue",until:"42nd Street"},
+   {action:"continue",street:"Curtis Avenue",until:"Fontenelle Boulevard"},
+   {action:"continue",street:"Fontenelle Boulevard",until:"Sorensen Parkway"},
+   {action:"continue",street:"30th Street",until:"North Omaha Transit Center"}]}
  ]},
 ];
 type Screen="home"|"route"|"learn"|"quiz"|"test"|"live"|"progress";
