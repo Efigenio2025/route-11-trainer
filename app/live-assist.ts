@@ -129,7 +129,7 @@ async function mountLiveMap(host: HTMLElement) {
       map.addLayer({ id: "route-11-line", type: "line", source: "route-11", paint: { "line-color": "#efb81d", "line-width": 4 } });
       map.addSource("route-11-stops", { type: "geojson", data: stopData });
       map.addLayer({ id: "route-11-stop-dots", type: "circle", source: "route-11-stops", paint: { "circle-radius": 7, "circle-color": "#ffffff", "circle-stroke-color": "#17263a", "circle-stroke-width": 3 } });
-      map.addLayer({ id: "route-11-stop-labels", type: "symbol", source: "route-11-stops", minzoom: 11.2, layout: { "text-field": ["get", "name"], "text-size": 11, "text-offset": [0, 1.25], "text-anchor": "top", "text-allow-overlap": false }, paint: { "text-color": "#17263a", "text-halo-color": "#ffffff", "text-halo-width": 2 } });
+      map.addLayer({ id: "route-11-stop-labels", type: "symbol", source: "route-11-stops", layout: { "text-field": ["get", "name"], "text-size": 11, "text-offset": [0, 1.25], "text-anchor": "top", "text-allow-overlap": true, "text-ignore-placement": true }, paint: { "text-color": "#17263a", "text-halo-color": "#ffffff", "text-halo-width": 2 } });
       checkpoints.forEach((point, i) => {
         const stopEl = document.createElement("button");
         stopEl.className = `route-stop-marker ${i === 0 ? "start" : i === checkpoints.length - 1 ? "finish" : ""}`;
