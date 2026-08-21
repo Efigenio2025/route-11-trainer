@@ -4,7 +4,7 @@ import path from "node:path";
 const routeNumber = process.argv[2] || "30";
 const feedDir = path.resolve("gtfs-official");
 const output = path.resolve(`app/route${routeNumber}-official.ts`);
-const directionNames = routeNumber === "26" ? ["LOOP"] : routeNumber === "11" || routeNumber === "4" ? ["WEST", "EAST"] : ["NORTH", "SOUTH"];
+const directionNames = routeNumber === "26" ? ["LOOP"] : ["11", "4", "15", "55"].includes(routeNumber) ? ["WEST", "EAST"] : ["NORTH", "SOUTH"];
 
 function parseCsv(text) {
   const rows = [];
@@ -43,9 +43,8 @@ const stopById = new Map(stops.map(s => [s.stop_id, s]));
 
 function directionData(directionId) {
   const candidates = activeTrips.filter(t => t.direction_id === directionId);
-  const shapeCounts = new Map();
-  for (const trip of candidates) shapeCounts.set(trip.shape_id, (shapeCounts.get(trip.shape_id) || 0) + 1);
-  const shapeId = [...shapeCounts].sort((a, b) => b[1] - a[1])[0][0];
+  const shapeIds = [...new Set(candidates.map(t => t.shape_id))];
+  const shapeId = shapeIds.sort((a, b) => shapes.filter(s => s.shape_id === b).length - shapes.filter(s => s.shape_id === a).length)[0];
   const trip = candidates.find(t => t.shape_id === shapeId);
   const coordinates = shapes.filter(s => s.shape_id === shapeId).sort((a, b) => Number(a.shape_pt_sequence) - Number(b.shape_pt_sequence)).map(s => [Number(s.shape_pt_lon), Number(s.shape_pt_lat)]);
   const routeStops = stopTimes.filter(s => s.trip_id === trip.trip_id).sort((a, b) => Number(a.stop_sequence) - Number(b.stop_sequence)).map(s => {
