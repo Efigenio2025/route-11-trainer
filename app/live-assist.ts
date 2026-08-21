@@ -90,6 +90,36 @@ function miles(a: [number, number], b: [number, number]) {
   return 3958.8 * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
 }
 
+function distanceToRoute(point: [number, number], route: [number, number][]) {
+  const latitudeScale = 69, longitudeScale = 69 * Math.cos(point[1] * Math.PI / 180);
+  let nearest = Infinity;
+  for (let i = 1; i < route.length; i++) {
+    const a = route[i - 1], b = route[i];
+    const ax = (a[0] - point[0]) * longitudeScale, ay = (a[1] - point[1]) * latitudeScale;
+    const bx = (b[0] - point[0]) * longitudeScale, by = (b[1] - point[1]) * latitudeScale;
+    const dx = bx - ax, dy = by - ay, length = dx * dx + dy * dy;
+    const t = length ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / length)) : 0;
+    nearest = Math.min(nearest, Math.hypot(ax + t * dx, ay + t * dy));
+  }
+  return nearest;
+}
+
+function spacedCheckpoints(route: [number, number][], count: number) {
+  if (count <= 1) return [route[route.length - 1]];
+  const lengths = [0];
+  for (let i = 1; i < route.length; i++) lengths.push(lengths[i - 1] + miles(route[i - 1], route[i]));
+  const total = lengths[lengths.length - 1];
+  return Array.from({length: count}, (_, n) => {
+    const target = total * ((n + 1) / count);
+    let i = 1; while (i < lengths.length - 1 && lengths[i] < target) i++;
+    return route[i];
+  });
+}
+
+function gpsEvent(detail: Record<string, unknown>) {
+  window.dispatchEvent(new CustomEvent("route-trainer-gps", {detail}));
+}
+
 async function mountLiveMap(host: HTMLElement) {
   if (host.dataset.enhanced) return;
   host.dataset.enhanced = "true";
@@ -104,11 +134,12 @@ async function mountLiveMap(host: HTMLElement) {
   const route11Shape = route11East ? ROUTE11_EAST_SHAPE : ROUTE11_WEST_SHAPE;
   const route4Stops = route4East ? ROUTE4_EAST_STOPS : ROUTE4_WEST_STOPS;
   const route4Shape = route4East ? ROUTE4_EAST_SHAPE : ROUTE4_WEST_SHAPE;
+  const maneuverCount = Number(host.dataset.maneuvers || 1);
   const checkpoints = routeNumber === "30"
     ? route30Turns.map(point => point.coordinates)
-    : routeNumber === "4"
-      ? route4Stops.map(point => point.coordinates)
-      : (host.dataset.direction === "eastbound" ? [...WESTBOUND].reverse() : WESTBOUND);
+    : routeNumber === "11" && maneuverCount === 10
+      ? spacedCheckpoints(route11Shape, maneuverCount)
+      : spacedCheckpoints(route4Shape, maneuverCount);
   const mapCoordinates = routeNumber === "30" ? route30Shape : routeNumber === "4" ? route4Shape : route11Shape;
   const stops: MapPoint[] = routeNumber === "30"
     ? route30Stops
@@ -155,7 +186,10 @@ async function mountLiveMap(host: HTMLElement) {
       .setLngLat(busPosition)
       .setPopup(new mapboxgl.Popup({ offset: 24 }).setText(`Route ${routeNumber} bus location`))
       .addTo(map);
-    centerButton.onclick = () => map.easeTo({ center: busPosition, zoom: Math.max(map.getZoom(), 14.5), duration: 500 });
+    let followBus = true;
+    centerButton.onclick = () => { followBus = true; map.easeTo({ center: busPosition, zoom: Math.max(map.getZoom(), 14.5), duration: 500 }); };
+    map.on("dragstart", () => { followBus = false; });
+    map.on("zoomstart", (event: any) => { if (event.originalEvent) followBus = false; });
     map.on("load", async () => {
       const routeData = { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: mapCoordinates } };
       const stopData = { type: "FeatureCollection", features: stops.map((stop, i) => ({ type: "Feature", properties: { name: stop.name, number: i + 1 }, geometry: { type: "Point", coordinates: stop.coordinates } })) };
@@ -191,22 +225,39 @@ async function mountLiveMap(host: HTMLElement) {
     const startGps = () => {
       if (!navigator.geolocation) { gpsButton.textContent = "GPS unavailable"; return; }
       gpsButton.textContent = "Locating…";
+      let targetIndex = 0, promptStage = 0, offRouteFixes = 0, onRouteFixes = 0, offRouteAnnounced = false, completionArmed = false, closestDistance = Infinity;
+      followBus = true;
       if (window.__routeTrainerWatch != null) navigator.geolocation.clearWatch(window.__routeTrainerWatch);
       window.__routeTrainerWatch = navigator.geolocation.watchPosition(position => {
         const current: [number, number] = [position.coords.longitude, position.coords.latitude];
-        busPosition = current; busMarker.setLngLat(current); map.easeTo({ center: current, zoom: 15.5, duration: 700 });
-        const nearest = checkpoints.map((p, i) => ({ i, d: miles(current, p) })).sort((a, b) => a.d - b.d)[0];
-        const routeDistance = Math.min(...mapCoordinates.map(point => miles(current, point)));
+        busPosition = current; busMarker.setLngLat(current); if (followBus) map.easeTo({ center: current, zoom: 15.5, duration: 500 });
+        const maneuverDistance = miles(current, checkpoints[Math.min(targetIndex, checkpoints.length - 1)]);
+        const routeDistance = distanceToRoute(current, mapCoordinates);
         const status = document.querySelector<HTMLElement>(".live-status span");
         const distance = document.querySelector<HTMLElement>(".next b");
-        const routeTolerance = routeNumber === "30" ? .35 : .2;
-        if (status) { status.textContent = routeDistance < routeTolerance ? "ON ROUTE" : "OFF ROUTE"; status.className = routeDistance < routeTolerance ? "tracking" : "off-route"; }
-        if (distance) distance.textContent = `${nearest.d < .1 ? Math.round(nearest.d * 5280) + " ft" : nearest.d.toFixed(1) + " mi"}`;
+        const routeTolerance = Math.max(.12, position.coords.accuracy * 0.000621371 + .04);
+        const onRoute = routeDistance < routeTolerance;
+        offRouteFixes = onRoute ? 0 : offRouteFixes + 1; onRouteFixes = onRoute ? onRouteFixes + 1 : 0;
+        if (offRouteFixes >= 3 && !offRouteAnnounced) { offRouteAnnounced = true; gpsEvent({type:"off-route"}); }
+        if (onRouteFixes >= 2 && offRouteAnnounced) { offRouteAnnounced = false; gpsEvent({type:"back-on-route"}); }
+        if (status) { status.textContent = onRoute ? "ON ROUTE" : "OFF ROUTE"; status.className = onRoute ? "tracking" : "off-route"; }
+        gpsEvent({type:"status", status:onRoute ? "tracking" : "off-route"});
+        if (distance) distance.textContent = `${maneuverDistance < .1 ? Math.round(maneuverDistance * 5280) + " ft" : maneuverDistance.toFixed(1) + " mi"}`;
+        if (onRoute && promptStage < 1 && maneuverDistance <= .35) { promptStage = 1; gpsEvent({type:"prepare", index:targetIndex, distance:maneuverDistance}); }
+        if (onRoute && promptStage < 2 && maneuverDistance <= .10) { promptStage = 2; gpsEvent({type:"near", index:targetIndex, distance:maneuverDistance}); }
+        if (onRoute && maneuverDistance <= .04) completionArmed = true;
+        if (completionArmed) closestDistance = Math.min(closestDistance, maneuverDistance);
+        if (onRoute && promptStage < 3 && completionArmed && (maneuverDistance <= .012 || maneuverDistance > closestDistance + .015)) {
+          const completed = targetIndex;
+          if (targetIndex < checkpoints.length - 1) { targetIndex += 1; promptStage = 0; completionArmed = false; closestDistance = Infinity; }
+          else promptStage = 3;
+          gpsEvent({type:"complete", index:completed, nextIndex:targetIndex, finished:completed === checkpoints.length - 1});
+        }
         const accuracy = document.querySelector<HTMLElement>(".avl-accuracy");
         const updated = document.querySelector<HTMLElement>(".avl-updated");
-        if (accuracy) accuracy.textContent = `±${Math.round(position.coords.accuracy)} ft`;
+        if (accuracy) accuracy.textContent = `±${Math.round(position.coords.accuracy * 3.28084)} ft`;
         if (updated) updated.textContent = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
-        gpsButton.textContent = `GPS active · ±${Math.round(position.coords.accuracy)} ft`;
+        gpsButton.textContent = `GPS active · ±${Math.round(position.coords.accuracy * 3.28084)} ft`;
       }, error => { gpsButton.textContent = error.code === 1 ? "Location permission denied" : "Unable to get location"; }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 12000 });
     };
     gpsButton.onclick = startGps;
