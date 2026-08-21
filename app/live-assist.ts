@@ -133,7 +133,7 @@ async function mountLiveMap(host: HTMLElement) {
       checkpoints.forEach((point, i) => {
         const stopEl = document.createElement("button");
         stopEl.className = `route-stop-marker ${i === 0 ? "start" : i === checkpoints.length - 1 ? "finish" : ""}`;
-        stopEl.type = "button"; stopEl.title = checkpointNames[i]; stopEl.setAttribute("aria-label", `Checkpoint ${i + 1}: ${checkpointNames[i]}`); stopEl.textContent = String(i + 1);
+        stopEl.type = "button"; stopEl.title = checkpointNames[i]; stopEl.setAttribute("aria-label", `Stop ${i + 1}: ${checkpointNames[i]}`); stopEl.innerHTML = `<span>${i + 1}</span><small>${checkpointNames[i]}</small>`;
         new mapboxgl.Marker({ element: stopEl, anchor: "center" }).setLngLat(point).addTo(map);
       });
       host.dataset.mapReady = "true";
