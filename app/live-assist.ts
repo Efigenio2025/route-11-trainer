@@ -187,6 +187,35 @@ function spacedCheckpoints(route: [number, number][], count: number) {
   });
 }
 
+// Build maneuver checkpoints from the actual bends in the official GTFS
+// geometry. This keeps announcements at intersections instead of distributing
+// them evenly over the trip, which could put a prompt in the middle of a block.
+function calibratedCheckpoints(route: [number, number][], count: number) {
+  if (count <= 1) return [route[route.length - 1]];
+  const lengths = routeLengths(route), total = lengths[lengths.length - 1];
+  const candidates: {coordinates:[number,number]; progress:number; angle:number}[] = [];
+  let lastProgress = -.1;
+  for (let i = 2; i < route.length - 2; i++) {
+    const angle = headingDifference(bearing(route[i - 2], route[i]), bearing(route[i], route[i + 2]));
+    const progress = lengths[i];
+    if (angle >= 32 && progress - lastProgress >= .018) {
+      candidates.push({coordinates:route[i], progress, angle});
+      lastProgress = progress;
+    }
+  }
+  let previous = -.01;
+  return Array.from({length:count}, (_, index) => {
+    if (index === count - 1) return route[route.length - 1];
+    const remaining = count - index, expected = previous + (total - previous) / remaining;
+    const available = candidates.filter(item => item.progress > previous + .006);
+    const selected = available.sort((a,b) => Math.abs(a.progress - expected) - Math.abs(b.progress - expected) || b.angle - a.angle)[0];
+    if (selected) { previous = selected.progress; return selected.coordinates; }
+    const fallback = spacedCheckpoints(route, count)[index];
+    previous = projectOnRoute(fallback, route, lengths).along;
+    return fallback;
+  });
+}
+
 function gpsEvent(detail: Record<string, unknown>) {
   window.dispatchEvent(new CustomEvent("route-trainer-gps", {detail}));
 }
@@ -221,16 +250,19 @@ async function mountLiveMap(host: HTMLElement) {
   const route95Stops = route95Am ? ROUTE95_SOUTH_STOPS : ROUTE95_NORTH_STOPS;
   const route95Shape = route95Am ? ROUTE95_SOUTH_SHAPE : ROUTE95_NORTH_SHAPE;
   const maneuverCount = Number(host.dataset.maneuvers || 1);
-  const mapCoordinates = routeNumber === "30" ? route30Shape : routeNumber === "4" ? route4Shape : routeNumber === "35" ? route35Shape : routeNumber === "36" ? route36Shape : routeNumber === "26" ? ROUTE26_LOOP_SHAPE : routeNumber === "15" ? route15Shape : routeNumber === "55" ? route55Shape : routeNumber === "95" ? route95Shape : route11Shape;
+  const route26Clockwise = routeNumber === "26" && host.dataset.direction === "clockwise";
+  const route26Shape = route26Clockwise ? [...ROUTE26_LOOP_SHAPE].reverse() : ROUTE26_LOOP_SHAPE;
+  const route26Stops = route26Clockwise ? [...ROUTE26_LOOP_STOPS].reverse() : ROUTE26_LOOP_STOPS;
+  const mapCoordinates = routeNumber === "30" ? route30Shape : routeNumber === "4" ? route4Shape : routeNumber === "35" ? route35Shape : routeNumber === "36" ? route36Shape : routeNumber === "26" ? route26Shape : routeNumber === "15" ? route15Shape : routeNumber === "55" ? route55Shape : routeNumber === "95" ? route95Shape : route11Shape;
   const checkpoints = routeNumber === "30"
     ? route30Turns.map(point => point.coordinates)
     : routeNumber === "95" ? (route95Am ? ROUTE95_AM_TURNS : ROUTE95_PM_TURNS)
-    : spacedCheckpoints(mapCoordinates, maneuverCount);
+    : calibratedCheckpoints(mapCoordinates, maneuverCount);
   const cumulativeRouteLengths = routeLengths(mapCoordinates);
   const checkpointProgress = orderedCheckpointProgress(checkpoints, mapCoordinates, cumulativeRouteLengths);
   const stops: MapPoint[] = routeNumber === "30"
     ? route30Stops
-    : routeNumber === "4" ? route4Stops : routeNumber === "35" ? route35Stops : routeNumber === "36" ? route36Stops : routeNumber === "26" ? ROUTE26_LOOP_STOPS : routeNumber === "15" ? route15Stops : routeNumber === "55" ? route55Stops : routeNumber === "95" ? route95Stops : route11Stops;
+    : routeNumber === "4" ? route4Stops : routeNumber === "35" ? route35Stops : routeNumber === "36" ? route36Stops : routeNumber === "26" ? route26Stops : routeNumber === "15" ? route15Stops : routeNumber === "55" ? route55Stops : routeNumber === "95" ? route95Stops : route11Stops;
   const fallback = document.createElement("canvas");
   fallback.className = "route-canvas";
   fallback.setAttribute("aria-label", `Route ${routeNumber} path`);
