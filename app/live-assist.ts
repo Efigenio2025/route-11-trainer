@@ -199,10 +199,17 @@ async function mountLiveMap(host: HTMLElement) {
       });
       host.dataset.mapReady = "true";
       try {
-        const points = checkpoints.map(p => p.join(",")).join(";");
-        const response = await fetch(`https://api.mapbox.com/directions/v5/mapbox/driving/${points}?geometries=geojson&overview=full&access_token=${TOKEN}`);
-        const data = await response.json();
-        if (data.routes?.[0]?.geometry?.coordinates) (map.getSource("route-11") as any).setData({ ...routeData, geometry: data.routes[0].geometry });
+        const legs = await Promise.all(checkpoints.slice(0, -1).map(async (from, index) => {
+          const to = checkpoints[index + 1];
+          const response = await fetch(`https://api.mapbox.com/directions/v5/mapbox/driving/${from.join(",")};${to.join(",")}?geometries=geojson&overview=full&steps=false&access_token=${TOKEN}`);
+          if (!response.ok) return [from, to] as [number, number][];
+          const data = await response.json();
+          return (data.routes?.[0]?.geometry?.coordinates || [from, to]) as [number, number][];
+        }));
+        const streetGeometry = legs.flatMap((leg, index) => index ? leg.slice(1) : leg);
+        if (streetGeometry.length > checkpoints.length) {
+          (map.getSource("route-11") as any).setData({ ...routeData, geometry: { type: "LineString", coordinates: streetGeometry } });
+        }
       } catch { /* The checkpoint route is already visible. */ }
       const bounds = checkpoints.reduce((b: any, p) => b.extend(p), new mapboxgl.LngLatBounds(checkpoints[0], checkpoints[0]));
       map.fitBounds(bounds, { padding: 45, duration: 0 });
