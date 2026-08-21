@@ -1,2 +1,3 @@
 .map{touch-action:auto;overflow:hidden}.mapbox-canvas{z-index:3;touch-action:pan-x pan-y}.mapboxgl-canvas{touch-action:pan-x pan-y}.route-stop-marker{width:28px;height:28px;font-size:9px}
+.route-stop-marker{position:relative;width:24px;height:24px;overflow:visible}.route-stop-marker span{display:grid;place-items:center;width:100%;height:100%}.route-stop-marker small{position:absolute;left:50%;top:27px;transform:translateX(-50%);white-space:nowrap;background:#fff;padding:3px 5px;border-radius:4px;font-size:9px;font-weight:800;color:#17263a;box-shadow:0 1px 5px #17263a44;pointer-events:none}
 
