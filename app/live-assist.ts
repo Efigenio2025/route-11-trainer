@@ -59,6 +59,28 @@ const ROUTE30_SOUTH_TURNS: MapPoint[] = [
   {name:"Right on Mercy to Aksarben T.C.",coordinates:[-96.0146,41.23883]},
 ];
 
+// Route 95 checkpoints follow the operator turn sheet, in maneuver order.
+// They are distinct from the passenger-stop coordinates shown on the map.
+const ROUTE95_AM_TURNS: [number, number][] = [
+  [-95.9539,41.2610], [-95.9555,41.2294], [-95.94995,41.20574],
+  [-95.95275,41.20641], [-95.95316,41.20608], [-95.95663,41.20641],
+  [-95.95316,41.20608], [-95.94991,41.20560], [-95.94940,41.20832],
+  [-95.94019,41.15889], [-95.92610,41.15656], [-95.91746,41.15087],
+  [-95.91075,41.14311], [-95.91237,41.14055], [-95.92876,41.14201],
+  [-95.93323,41.25966], [-95.93843,41.25967], [-95.93846,41.26144],
+];
+const ROUTE95_PM_TURNS: [number, number][] = [
+  [-95.93712,41.26796], [-95.93713,41.26177], [-95.93843,41.26068],
+  [-95.93843,41.25865], [-95.93455,41.25865], [-95.93456,41.25233],
+  [-95.93332,41.25233], [-95.93332,41.21496], [-95.92638,41.17646],
+  [-95.92537,41.17624], [-95.92638,41.17646], [-95.92638,41.17646],
+  [-95.91746,41.15087], [-95.91075,41.14311], [-95.91237,41.14055],
+  [-95.92883,41.14178], [-95.93421,41.14061], [-95.93859,41.15879],
+  [-95.94995,41.20574], [-95.95275,41.20641], [-95.95663,41.20641],
+  [-95.95316,41.20608], [-95.95275,41.20641], [-95.95350,41.20810],
+  [-95.94915,41.20831],
+];
+
 declare global {
   interface Window { mapboxgl?: any; __routeTrainerWatch?: number; __startRouteGPS?: () => void; }
 }
@@ -151,7 +173,10 @@ async function mountLiveMap(host: HTMLElement) {
   const route95Shape = route95Am ? ROUTE95_SOUTH_SHAPE : ROUTE95_NORTH_SHAPE;
   const maneuverCount = Number(host.dataset.maneuvers || 1);
   const mapCoordinates = routeNumber === "30" ? route30Shape : routeNumber === "4" ? route4Shape : routeNumber === "35" ? route35Shape : routeNumber === "36" ? route36Shape : routeNumber === "26" ? ROUTE26_LOOP_SHAPE : routeNumber === "15" ? route15Shape : routeNumber === "55" ? route55Shape : routeNumber === "95" ? route95Shape : route11Shape;
-  const checkpoints = routeNumber === "30" ? route30Turns.map(point => point.coordinates) : spacedCheckpoints(mapCoordinates, maneuverCount);
+  const checkpoints = routeNumber === "30"
+    ? route30Turns.map(point => point.coordinates)
+    : routeNumber === "95" ? (route95Am ? ROUTE95_AM_TURNS : ROUTE95_PM_TURNS)
+    : spacedCheckpoints(mapCoordinates, maneuverCount);
   const stops: MapPoint[] = routeNumber === "30"
     ? route30Stops
     : routeNumber === "4" ? route4Stops : routeNumber === "35" ? route35Stops : routeNumber === "36" ? route36Stops : routeNumber === "26" ? ROUTE26_LOOP_STOPS : routeNumber === "15" ? route15Stops : routeNumber === "55" ? route55Stops : routeNumber === "95" ? route95Stops : route11Stops;
@@ -239,6 +264,9 @@ async function mountLiveMap(host: HTMLElement) {
       let targetIndex = 0, promptStage = 0, offRouteFixes = 0, onRouteFixes = 0, offRouteAnnounced = false, completionArmed = false, closestDistance = Infinity;
       const announcedStops = new Set<number>();
       followBus = true;
+      // Fired synchronously from the Start live GPS tap. This unlocks spoken
+      // guidance on iPhone Safari before asynchronous location fixes arrive.
+      gpsEvent({type:"start", index:0});
       if (window.__routeTrainerWatch != null) navigator.geolocation.clearWatch(window.__routeTrainerWatch);
       window.__routeTrainerWatch = navigator.geolocation.watchPosition(position => {
         const current: [number, number] = [position.coords.longitude, position.coords.latitude];
