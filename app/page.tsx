@@ -90,6 +90,36 @@ const routes:Route[]=[
    {action:"continue",street:"Curtis Avenue",until:"Fontenelle Boulevard"},
    {action:"continue",street:"Fontenelle Boulevard",until:"Sorensen Parkway"},
    {action:"continue",street:"30th Street",until:"North Omaha Transit Center"}]}
+  ]},
+ {id:"15",number:"15",name:"Center Street",subtitle:"22nd & Cuming ↔ Oak View Mall",directions:[
+  {id:"westbound",label:"Westbound",origin:"22nd & Cuming",destination:"Oak View Mall",steps:[
+   {action:"continue",street:"Downtown and midtown",until:"42nd Street"},
+   {action:"continue",street:"42nd Street",until:"Center Street"},
+   {action:"continue",street:"Center Street",until:"Aksarben Transit Center"},
+   {action:"continue",street:"West Center Road",until:"84th Street"},
+   {action:"continue",street:"West Center Road",until:"108th Street"},
+   {action:"continue",street:"West Center Road",until:"Oak View Mall"}]},
+  {id:"eastbound",label:"Eastbound",origin:"Oak View Mall",destination:"22nd & Cuming",steps:[
+   {action:"continue",street:"West Center Road",until:"108th Street"},
+   {action:"continue",street:"West Center Road",until:"84th Street"},
+   {action:"continue",street:"Center Street",until:"Aksarben Transit Center"},
+   {action:"continue",street:"Center Street",until:"42nd Street"},
+   {action:"continue",street:"Midtown and downtown",until:"22nd & Cuming"}]}
+ ]},
+ {id:"55",number:"55",name:"Q Street",subtitle:"22nd & Cuming ↔ 118th & Q",directions:[
+  {id:"westbound",label:"Westbound",origin:"22nd & Cuming",destination:"118th & Q",steps:[
+   {action:"continue",street:"Downtown and Center Street",until:"Aksarben Transit Center"},
+   {action:"continue",street:"Mercy Road",until:"84th Street"},
+   {action:"continue",street:"84th Street",until:"Q Street"},
+   {action:"continue",street:"Q Street",until:"96th Street"},
+   {action:"continue",street:"Q Street",until:"108th Street"},
+   {action:"continue",street:"Q Street",until:"118th Street"}]},
+  {id:"eastbound",label:"Eastbound",origin:"118th & Q",destination:"22nd & Cuming",steps:[
+   {action:"continue",street:"Q Street",until:"108th Street"},
+   {action:"continue",street:"Q Street",until:"96th Street"},
+   {action:"continue",street:"84th Street",until:"Center Street"},
+   {action:"continue",street:"Mercy Road",until:"Aksarben Transit Center"},
+   {action:"continue",street:"Center Street and downtown",until:"22nd & Cuming"}]}
  ]},
 ];
 type Screen="home"|"route"|"learn"|"quiz"|"test"|"live"|"progress";
