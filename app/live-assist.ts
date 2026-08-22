@@ -347,6 +347,8 @@ async function mountLiveMap(host: HTMLElement) {
       let targetIndex = 0, promptStage = 0, offRouteFixes = 0, onRouteFixes = 0, offRouteAnnounced = false;
       let initialized = false, headingLocked = false, lastPosition: [number, number] | null = null, lastRouteSegment = 1, lastAlong: number | null = null;
       let fixCount = 0, wrongWayFixes = 0, wrongWayAnnounced = false, weakGpsAnnounced = false;
+      let mapMatchedPosition: [number, number] | null = null, mapMatchedAt = 0, mapMatchInFlight = false, lastMapMatchRequest = 0;
+      const gpsTrace: {coordinates:[number,number]; accuracy:number; timestamp:number}[] = [];
       const announcedStops = new Set<number>();
       followBus = true;
       // Fired synchronously from the Start live GPS tap. This unlocks spoken
@@ -354,13 +356,39 @@ async function mountLiveMap(host: HTMLElement) {
       gpsEvent({type:"start"});
       if (window.__routeTrainerWatch != null) navigator.geolocation.clearWatch(window.__routeTrainerWatch);
       window.__routeTrainerWatch = navigator.geolocation.watchPosition(position => {
-        const current: [number, number] = [position.coords.longitude, position.coords.latitude];
+        const rawCurrent: [number, number] = [position.coords.longitude, position.coords.latitude];
+        gpsTrace.push({coordinates:rawCurrent, accuracy:Math.min(50, Math.max(5, position.coords.accuracy)), timestamp:Math.floor(position.timestamp / 1000)});
+        if (gpsTrace.length > 8) gpsTrace.shift();
+        const now = Date.now();
+        if (gpsTrace.length >= 2 && !mapMatchInFlight && now - lastMapMatchRequest >= 4000) {
+          mapMatchInFlight = true; lastMapMatchRequest = now;
+          const trace = [...gpsTrace], coordinates = trace.map(item => item.coordinates.join(",")).join(";");
+          const radiuses = trace.map(item => Math.round(item.accuracy)).join(";");
+          const timestamps = trace.map(item => item.timestamp).join(";");
+          fetch(`https://api.mapbox.com/matching/v5/mapbox/driving/${coordinates}?access_token=${TOKEN}&geometries=geojson&tidy=true&radiuses=${radiuses}&timestamps=${timestamps}`)
+            .then(response => response.ok ? response.json() : Promise.reject(new Error("Map matching unavailable")))
+            .then(data => {
+              const tracepoints = data?.tracepoints, candidate = tracepoints?.[tracepoints.length - 1]?.location;
+              const confidence = Number(data?.matchings?.[0]?.confidence ?? 0);
+              if (!Array.isArray(candidate) || confidence < .2) return;
+              const snapped: [number,number] = [Number(candidate[0]), Number(candidate[1])];
+              if (!Number.isFinite(snapped[0]) || !Number.isFinite(snapped[1]) || miles(rawCurrent, snapped) > .18) return;
+              mapMatchedPosition = snapped; mapMatchedAt = Date.now();
+              busPosition = snapped; busMarker.setLngLat(snapped);
+              if (followBus) map.easeTo({center:snapped, zoom:15.5, duration:350});
+            })
+            .catch(() => { /* Raw high-accuracy GPS remains the safe fallback. */ })
+            .finally(() => { mapMatchInFlight = false; });
+        }
+        const mapMatchFresh = mapMatchedPosition && now - mapMatchedAt < 9000;
+        const current: [number, number] = mapMatchFresh ? mapMatchedPosition! : rawCurrent;
         busPosition = current; busMarker.setLngLat(current); if (followBus) map.easeTo({ center: current, zoom: 15.5, duration: 500 });
         fixCount += 1;
-        const moved = lastPosition ? miles(lastPosition, current) : 0;
+        const moved = lastPosition ? miles(lastPosition, rawCurrent) : 0;
         const movementHeading = Number.isFinite(position.coords.heading) && position.coords.heading != null
           ? position.coords.heading
-          : lastPosition && moved > .004 ? bearing(lastPosition, current) : null;
+          : lastPosition && moved > .004 ? bearing(lastPosition, rawCurrent) : null;
+        const rawRouteMatch = projectOnRoute(rawCurrent, mapCoordinates, cumulativeRouteLengths, {heading:movementHeading});
         const globalMatch = projectOnRoute(current, mapCoordinates, cumulativeRouteLengths, {heading:movementHeading});
         const localMatch = initialized ? projectOnRoute(current, mapCoordinates, cumulativeRouteLengths, {
           startSegment:Math.max(1,lastRouteSegment - 18), endSegment:lastRouteSegment + 110,
@@ -395,7 +423,7 @@ async function mountLiveMap(host: HTMLElement) {
         }
         const maneuverDistance = Math.max(0, checkpointProgress[Math.min(targetIndex, checkpointProgress.length - 1)] - routeMatch.along);
         const nearestStop = stops.map((stop, i) => ({i, stop, distance:miles(current, stop.coordinates)})).sort((a, b) => a.distance - b.distance)[0];
-        const routeDistance = routeMatch.distance;
+        const routeDistance = rawRouteMatch.distance;
         const status = document.querySelector<HTMLElement>(".live-status span");
         const distance = document.querySelector<HTMLElement>(".next b");
         const routeTolerance = Math.max(.12, position.coords.accuracy * 0.000621371 + .04);
@@ -408,7 +436,7 @@ async function mountLiveMap(host: HTMLElement) {
         wrongWayFixes = wrongWay ? wrongWayFixes + 1 : 0;
         if (wrongWayFixes >= 3 && !wrongWayAnnounced) { wrongWayAnnounced = true; gpsEvent({type:"wrong-way"}); }
         if (!wrongWay && wrongWayAnnounced) { wrongWayAnnounced = false; gpsEvent({type:"direction-correct"}); }
-        lastPosition = current; lastRouteSegment = routeMatch.segment; lastAlong = routeMatch.along;
+        lastPosition = rawCurrent; lastRouteSegment = routeMatch.segment; lastAlong = routeMatch.along;
         if (status) { status.textContent = onRoute ? "ON ROUTE" : "OFF ROUTE"; status.className = onRoute ? "tracking" : "off-route"; }
         gpsEvent({type:"status", status:onRoute ? "tracking" : "off-route"});
         if (distance) distance.textContent = `${maneuverDistance < .1 ? Math.round(maneuverDistance * 5280) + " ft" : maneuverDistance.toFixed(1) + " mi"}`;
@@ -428,7 +456,7 @@ async function mountLiveMap(host: HTMLElement) {
         const updated = document.querySelector<HTMLElement>(".avl-updated");
         if (accuracy) accuracy.textContent = `±${Math.round(position.coords.accuracy * 3.28084)} ft`;
         if (updated) updated.textContent = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
-        gpsButton.textContent = `GPS active · ±${Math.round(position.coords.accuracy * 3.28084)} ft`;
+        gpsButton.textContent = `${mapMatchFresh ? "Road matched" : "GPS active"} · ±${Math.round(position.coords.accuracy * 3.28084)} ft`;
       }, error => { gpsButton.textContent = error.code === 1 ? "Location permission denied" : "Unable to get location"; }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 12000 });
     };
     gpsButton.onclick = startGps;
