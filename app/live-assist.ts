@@ -220,6 +220,23 @@ function gpsEvent(detail: Record<string, unknown>) {
   window.dispatchEvent(new CustomEvent("route-trainer-gps", {detail}));
 }
 
+function sampleAppleWaypoints(points: [number, number][], maximum = 8) {
+  if (points.length <= maximum) return points;
+  return Array.from({length:maximum}, (_, index) => points[Math.round(index * (points.length - 1) / (maximum - 1))])
+    .filter((point, index, sampled) => index === 0 || point !== sampled[index - 1]);
+}
+
+function appleMapsRouteUrl(source: [number, number], destination: [number, number], waypoints: [number, number][]) {
+  const coordinate = ([longitude, latitude]: [number, number]) => `${latitude.toFixed(6)},${longitude.toFixed(6)}`;
+  const parameters = new URLSearchParams({
+    source:coordinate(source),
+    destination:coordinate(destination),
+    mode:"driving",
+  });
+  waypoints.forEach(point => parameters.append("waypoint", coordinate(point)));
+  return `https://maps.apple.com/directions?${parameters.toString()}`;
+}
+
 async function mountLiveMap(host: HTMLElement) {
   if (host.dataset.enhanced) return;
   host.dataset.enhanced = "true";
@@ -293,14 +310,32 @@ async function mountLiveMap(host: HTMLElement) {
   centerButton.className = "center-bus";
   centerButton.textContent = "Center on bus";
   details.appendChild(centerButton);
+  const appleMapsButton = document.createElement("button");
+  appleMapsButton.type = "button";
+  appleMapsButton.className = "apple-maps-button";
+  appleMapsButton.textContent = "Open route in Apple Maps";
+  details.appendChild(appleMapsButton);
+  const appleMapsNote = document.createElement("small");
+  appleMapsNote.className = "apple-maps-note";
+  appleMapsNote.textContent = "Opens a driving preview. Route Trainer alerts may pause while Apple Maps is open.";
+  details.appendChild(appleMapsNote);
   host.parentElement?.querySelector(".live-panel")?.prepend(details);
+  let busPosition: [number, number] = mapCoordinates[0];
+  let currentRouteProgress = 0;
+  appleMapsButton.onclick = () => {
+    const destination = mapCoordinates[mapCoordinates.length - 1];
+    const remainingTurns = checkpoints.filter((point, index) =>
+      checkpointProgress[index] > currentRouteProgress + .01 && miles(point, destination) > .03
+    );
+    const previewUrl = appleMapsRouteUrl(busPosition, destination, sampleAppleWaypoints(remainingTurns));
+    window.location.assign(previewUrl);
+  };
   try {
     const mapboxgl = await loadMapbox();
     mapboxgl.accessToken = TOKEN;
     const map = new mapboxgl.Map({ container: mapNode, style: "mapbox://styles/mapbox/streets-v12", center: [-95.974, 41.251], zoom: 11.7, attributionControl: true, interactive: true, dragPan: true, scrollZoom: true, touchZoomRotate: true, doubleClickZoom: true });
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false, visualizePitch: false }), "bottom-right");
     map.dragPan.enable(); map.scrollZoom.enable(); map.touchZoomRotate.enable(); map.doubleClickZoom.enable();
-    let busPosition: [number, number] = mapCoordinates[0];
     const busMarker = new mapboxgl.Marker({ color: "#17263a", scale: 0.85 })
       .setLngLat(busPosition)
       .setPopup(new mapboxgl.Popup({ offset: 24 }).setText(`Route ${routeNumber} bus location`))
@@ -399,6 +434,7 @@ async function mountLiveMap(host: HTMLElement) {
         // pass of the same street while still allowing recovery after a gap.
         const resolvingHeading = initialized && !headingLocked && movementHeading != null;
         const routeMatch = !initialized || fixCount <= 4 || resolvingHeading || localMatch.distance > .25 ? globalMatch : localMatch;
+        currentRouteProgress = routeMatch.along;
         const reliableGps = position.coords.accuracy <= 55;
         if (!reliableGps && !weakGpsAnnounced) { weakGpsAnnounced = true; gpsEvent({type:"gps-weak"}); }
         if (reliableGps) weakGpsAnnounced = false;
