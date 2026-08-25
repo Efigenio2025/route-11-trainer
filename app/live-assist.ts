@@ -220,7 +220,7 @@ function gpsEvent(detail: Record<string, unknown>) {
   window.dispatchEvent(new CustomEvent("route-trainer-gps", {detail}));
 }
 
-function sampleAppleWaypoints(points: [number, number][], maximum = 8) {
+function sampleOrderedWaypoints(points: [number, number][], maximum: number) {
   if (points.length <= maximum) return points;
   return Array.from({length:maximum}, (_, index) => points[Math.round(index * (points.length - 1) / (maximum - 1))])
     .filter((point, index, sampled) => index === 0 || point !== sampled[index - 1]);
@@ -236,6 +236,19 @@ function appleMapsRouteUrl(source: [number, number], destination: [number, numbe
   });
   waypoints.forEach(point => parameters.append("waypoint", coordinate(point)));
   return `https://maps.apple.com/directions?${parameters.toString()}`;
+}
+
+function googleMapsRouteUrl(source: [number, number], destination: [number, number], waypoints: [number, number][]) {
+  const coordinate = ([longitude, latitude]: [number, number]) => `${latitude.toFixed(6)},${longitude.toFixed(6)}`;
+  const parameters = new URLSearchParams({
+    api:"1",
+    origin:coordinate(source),
+    destination:coordinate(destination),
+    travelmode:"driving",
+    dir_action:"navigate",
+  });
+  if (waypoints.length) parameters.set("waypoints", waypoints.map(coordinate).join("|"));
+  return `https://www.google.com/maps/dir/?${parameters.toString()}`;
 }
 
 async function mountLiveMap(host: HTMLElement) {
@@ -316,9 +329,14 @@ async function mountLiveMap(host: HTMLElement) {
   appleMapsButton.className = "apple-maps-button";
   appleMapsButton.textContent = "Start Apple Maps navigation";
   details.appendChild(appleMapsButton);
+  const googleMapsButton = document.createElement("button");
+  googleMapsButton.type = "button";
+  googleMapsButton.className = "google-maps-button";
+  googleMapsButton.textContent = "Start Google Maps navigation";
+  details.appendChild(googleMapsButton);
   const appleMapsNote = document.createElement("small");
   appleMapsNote.className = "apple-maps-note";
-  appleMapsNote.textContent = "Apple Maps starts spoken driving guidance after 3 seconds. Route Trainer alerts may pause while Apple Maps is open.";
+  appleMapsNote.textContent = "Choose Apple or Google for spoken driving guidance. Route Trainer alerts may pause while another navigation app is open.";
   details.appendChild(appleMapsNote);
   host.parentElement?.querySelector(".live-panel")?.prepend(details);
   let busPosition: [number, number] = mapCoordinates[0];
@@ -328,8 +346,16 @@ async function mountLiveMap(host: HTMLElement) {
     const remainingTurns = checkpoints.filter((point, index) =>
       checkpointProgress[index] > currentRouteProgress + .01 && miles(point, destination) > .03
     );
-    const previewUrl = appleMapsRouteUrl(busPosition, destination, sampleAppleWaypoints(remainingTurns));
+    const previewUrl = appleMapsRouteUrl(busPosition, destination, sampleOrderedWaypoints(remainingTurns, 8));
     window.location.assign(previewUrl);
+  };
+  googleMapsButton.onclick = () => {
+    const destination = mapCoordinates[mapCoordinates.length - 1];
+    const remainingTurns = checkpoints.filter((point, index) =>
+      checkpointProgress[index] > currentRouteProgress + .01 && miles(point, destination) > .03
+    );
+    const navigationUrl = googleMapsRouteUrl(busPosition, destination, sampleOrderedWaypoints(remainingTurns, 3));
+    window.location.assign(navigationUrl);
   };
   try {
     const mapboxgl = await loadMapbox();
