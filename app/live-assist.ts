@@ -232,6 +232,7 @@ function appleMapsRouteUrl(source: [number, number], destination: [number, numbe
     source:coordinate(source),
     destination:coordinate(destination),
     mode:"driving",
+    start:"3",
   });
   waypoints.forEach(point => parameters.append("waypoint", coordinate(point)));
   return `https://maps.apple.com/directions?${parameters.toString()}`;
@@ -313,11 +314,11 @@ async function mountLiveMap(host: HTMLElement) {
   const appleMapsButton = document.createElement("button");
   appleMapsButton.type = "button";
   appleMapsButton.className = "apple-maps-button";
-  appleMapsButton.textContent = "Open route in Apple Maps";
+  appleMapsButton.textContent = "Start Apple Maps navigation";
   details.appendChild(appleMapsButton);
   const appleMapsNote = document.createElement("small");
   appleMapsNote.className = "apple-maps-note";
-  appleMapsNote.textContent = "Opens a driving preview. Route Trainer alerts may pause while Apple Maps is open.";
+  appleMapsNote.textContent = "Apple Maps starts spoken driving guidance after 3 seconds. Route Trainer alerts may pause while Apple Maps is open.";
   details.appendChild(appleMapsNote);
   host.parentElement?.querySelector(".live-panel")?.prepend(details);
   let busPosition: [number, number] = mapCoordinates[0];
