@@ -406,7 +406,7 @@ async function mountLiveMap(host: HTMLElement) {
     const startGps = () => {
       if (!navigator.geolocation) { gpsButton.textContent = "GPS unavailable"; return; }
       gpsButton.textContent = "Locating…";
-      let targetIndex = 0, promptStage = 0, offRouteFixes = 0, onRouteFixes = 0, offRouteAnnounced = false;
+      let targetIndex = 0, promptStage = 0, completionFixes = 0, offRouteFixes = 0, onRouteFixes = 0, offRouteAnnounced = false;
       let initialized = false, headingLocked = false, lastPosition: [number, number] | null = null, lastRouteSegment = 1, lastAlong: number | null = null;
       let fixCount = 0, wrongWayFixes = 0, wrongWayAnnounced = false, weakGpsAnnounced = false;
       let mapMatchedPosition: [number, number] | null = null, mapMatchedAt = 0, mapMatchInFlight = false, lastMapMatchRequest = 0;
@@ -474,15 +474,10 @@ async function mountLiveMap(host: HTMLElement) {
           const corrected = checkpointProgress.findIndex(progress => progress >= routeMatch.along + .01);
           const correctedTarget = corrected < 0 ? checkpoints.length - 1 : corrected;
           if (Math.abs(correctedTarget - targetIndex) > 1) {
-            targetIndex = correctedTarget; promptStage = 0;
+            targetIndex = correctedTarget; promptStage = 0; completionFixes = 0;
             gpsEvent({type:"reacquired", index:targetIndex});
           }
           headingLocked = true;
-        }
-        while (reliableGps && targetIndex < checkpoints.length - 1 && routeMatch.along > checkpointProgress[targetIndex] + .025) {
-          const completed = targetIndex++;
-          promptStage = 0;
-          gpsEvent({type:"complete", index:completed, nextIndex:targetIndex, passed:true});
         }
         const maneuverDistance = Math.max(0, checkpointProgress[Math.min(targetIndex, checkpointProgress.length - 1)] - routeMatch.along);
         const nearestStop = stops.map((stop, i) => ({i, stop, distance:miles(current, stop.coordinates)})).sort((a, b) => a.distance - b.distance)[0];
@@ -503,16 +498,21 @@ async function mountLiveMap(host: HTMLElement) {
         if (status) { status.textContent = onRoute ? "ON ROUTE" : "OFF ROUTE"; status.className = onRoute ? "tracking" : "off-route"; }
         gpsEvent({type:"status", status:onRoute ? "tracking" : "off-route"});
         if (distance) distance.textContent = `${maneuverDistance < .1 ? Math.round(maneuverDistance * 5280) + " ft" : maneuverDistance.toFixed(1) + " mi"}`;
-        if (reliableGps && onRoute && !wrongWay && promptStage < 1 && maneuverDistance <= .50) { promptStage = 1; gpsEvent({type:"prepare", index:targetIndex, distance:maneuverDistance}); }
-        if (reliableGps && onRoute && !wrongWay && promptStage < 2 && maneuverDistance <= .12) { promptStage = 2; gpsEvent({type:"near", index:targetIndex, distance:maneuverDistance}); }
-        if (reliableGps && onRoute && nearestStop.distance <= 300 / 5280 && !announcedStops.has(nearestStop.i)) {
+        if (reliableGps && onRoute && !wrongWay) {
+          if (promptStage < 3 && maneuverDistance <= .035) { promptStage = 3; gpsEvent({type:"now", index:targetIndex, distance:maneuverDistance}); }
+          else if (promptStage < 2 && maneuverDistance <= .12) { promptStage = 2; gpsEvent({type:"near", index:targetIndex, distance:maneuverDistance}); }
+          else if (promptStage < 1 && maneuverDistance <= .50) { promptStage = 1; gpsEvent({type:"prepare", index:targetIndex, distance:maneuverDistance}); }
+        }
+        if (reliableGps && onRoute && maneuverDistance > .08 && nearestStop.distance <= 300 / 5280 && !announcedStops.has(nearestStop.i)) {
           announcedStops.add(nearestStop.i);
           gpsEvent({type:"stop-ahead", stopName:nearestStop.stop.name, distanceFeet:Math.round(nearestStop.distance * 5280)});
         }
-        if (reliableGps && onRoute && !wrongWay && promptStage < 3 && routeMatch.along >= checkpointProgress[targetIndex] + .012) {
+        const passedManeuver = promptStage < 4 && reliableGps && onRoute && !wrongWay && routeMatch.along >= checkpointProgress[targetIndex] + .012;
+        completionFixes = passedManeuver ? completionFixes + 1 : 0;
+        if (completionFixes >= 2) {
           const completed = targetIndex;
-          if (targetIndex < checkpoints.length - 1) { targetIndex += 1; promptStage = 0; }
-          else promptStage = 3;
+          if (targetIndex < checkpoints.length - 1) { targetIndex += 1; promptStage = 0; completionFixes = 0; }
+          else { promptStage = 4; completionFixes = 0; }
           gpsEvent({type:"complete", index:completed, nextIndex:targetIndex, finished:completed === checkpoints.length - 1});
         }
         const accuracy = document.querySelector<HTMLElement>(".avl-accuracy");
