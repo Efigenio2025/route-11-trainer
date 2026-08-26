@@ -368,7 +368,43 @@ async function mountLiveMap(host: HTMLElement) {
       .setPopup(new mapboxgl.Popup({ offset: 24 }).setText(`Route ${routeNumber} bus location`))
       .addTo(map);
     let followBus = true;
-    centerButton.onclick = () => { followBus = true; map.easeTo({ center: busPosition, zoom: Math.max(map.getZoom(), 14.5), duration: 500 }); };
+    let trackUp = false;
+    let latestTravelHeading: number | null = null;
+    let trackUpButton: HTMLButtonElement | null = null;
+    const focusBusOnMap = (target: [number, number], zoom: number, duration: number) => {
+      if (!followBus) return;
+      const options: { center: [number, number]; zoom: number; duration: number; bearing?: number } = { center: target, zoom, duration };
+      if (trackUp && latestTravelHeading != null) options.bearing = latestTravelHeading;
+      map.easeTo(options);
+    };
+    const refreshTrackUpButton = () => {
+      if (!trackUpButton) return;
+      trackUpButton.classList.toggle("is-active", trackUp);
+      trackUpButton.setAttribute("aria-pressed", String(trackUp));
+      trackUpButton.setAttribute("aria-label", trackUp ? "Turn Track Up off" : "Turn Track Up on");
+      trackUpButton.title = trackUp ? "Track Up is on" : "Turn Track Up on";
+      trackUpButton.textContent = trackUp ? "↑ Track" : "N ↑";
+    };
+    map.addControl({
+      onAdd() {
+        const container = document.createElement("div");
+        container.className = "mapboxgl-ctrl mapboxgl-ctrl-group track-up-group";
+        trackUpButton = document.createElement("button");
+        trackUpButton.type = "button";
+        trackUpButton.className = "track-up-control";
+        trackUpButton.addEventListener("click", () => {
+          trackUp = !trackUp;
+          followBus = true;
+          refreshTrackUpButton();
+          map.easeTo({ center: busPosition, zoom: Math.max(map.getZoom(), 14.5), bearing: trackUp && latestTravelHeading != null ? latestTravelHeading : 0, duration: 450 });
+        });
+        refreshTrackUpButton();
+        container.appendChild(trackUpButton);
+        return container;
+      },
+      onRemove() { trackUpButton = null; },
+    }, "bottom-right");
+    centerButton.onclick = () => { followBus = true; focusBusOnMap(busPosition, Math.max(map.getZoom(), 14.5), 500); };
     map.on("dragstart", () => { followBus = false; });
     map.on("zoomstart", (event: any) => { if (event.originalEvent) followBus = false; });
     map.on("load", async () => {
@@ -419,6 +455,11 @@ async function mountLiveMap(host: HTMLElement) {
       if (window.__routeTrainerWatch != null) navigator.geolocation.clearWatch(window.__routeTrainerWatch);
       window.__routeTrainerWatch = navigator.geolocation.watchPosition(position => {
         const rawCurrent: [number, number] = [position.coords.longitude, position.coords.latitude];
+        const moved = lastPosition ? miles(lastPosition, rawCurrent) : 0;
+        const movementHeading = Number.isFinite(position.coords.heading) && position.coords.heading != null
+          ? (position.coords.heading % 360 + 360) % 360
+          : lastPosition && moved > .004 ? bearing(lastPosition, rawCurrent) : null;
+        if (movementHeading != null) latestTravelHeading = movementHeading;
         gpsTrace.push({coordinates:rawCurrent, accuracy:Math.min(50, Math.max(5, position.coords.accuracy)), timestamp:Math.floor(position.timestamp / 1000)});
         if (gpsTrace.length > 8) gpsTrace.shift();
         const now = Date.now();
@@ -437,19 +478,15 @@ async function mountLiveMap(host: HTMLElement) {
               if (!Number.isFinite(snapped[0]) || !Number.isFinite(snapped[1]) || miles(rawCurrent, snapped) > .18) return;
               mapMatchedPosition = snapped; mapMatchedAt = Date.now();
               busPosition = snapped; busMarker.setLngLat(snapped);
-              if (followBus) map.easeTo({center:snapped, zoom:15.5, duration:350});
+              focusBusOnMap(snapped, 15.5, 350);
             })
             .catch(() => { /* Raw high-accuracy GPS remains the safe fallback. */ })
             .finally(() => { mapMatchInFlight = false; });
         }
         const mapMatchFresh = mapMatchedPosition && now - mapMatchedAt < 9000;
         const current: [number, number] = mapMatchFresh ? mapMatchedPosition! : rawCurrent;
-        busPosition = current; busMarker.setLngLat(current); if (followBus) map.easeTo({ center: current, zoom: 15.5, duration: 500 });
+        busPosition = current; busMarker.setLngLat(current); focusBusOnMap(current, 15.5, 500);
         fixCount += 1;
-        const moved = lastPosition ? miles(lastPosition, rawCurrent) : 0;
-        const movementHeading = Number.isFinite(position.coords.heading) && position.coords.heading != null
-          ? position.coords.heading
-          : lastPosition && moved > .004 ? bearing(lastPosition, rawCurrent) : null;
         const rawRouteMatch = projectOnRoute(rawCurrent, mapCoordinates, cumulativeRouteLengths, {heading:movementHeading});
         const globalMatch = projectOnRoute(current, mapCoordinates, cumulativeRouteLengths, {heading:movementHeading});
         const localMatch = initialized ? projectOnRoute(current, mapCoordinates, cumulativeRouteLengths, {
