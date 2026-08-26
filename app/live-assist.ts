@@ -85,25 +85,11 @@ declare global {
   interface Window { mapboxgl?: any; __routeTrainerWatch?: number; __startRouteGPS?: () => void; }
 }
 
-function loadMapbox(): Promise<any> {
-  if (window.mapboxgl) return Promise.resolve(window.mapboxgl);
-  return new Promise((resolve, reject) => {
-    if (!document.querySelector("link[data-mapbox]")) {
-      const link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = "https://api.mapbox.com/mapbox-gl-js/v3.25.0/mapbox-gl.css";
-      link.dataset.mapbox = "true";
-      document.head.appendChild(link);
-    }
-    const existing = document.querySelector<HTMLScriptElement>("script[data-mapbox]");
-    if (existing) { existing.addEventListener("load", () => resolve(window.mapboxgl)); return; }
-    const script = document.createElement("script");
-    script.src = "https://api.mapbox.com/mapbox-gl-js/v3.25.0/mapbox-gl.js";
-    script.dataset.mapbox = "true";
-    script.onload = () => resolve(window.mapboxgl);
-    script.onerror = reject;
-    document.head.appendChild(script);
-  });
+async function loadMapbox(): Promise<any> {
+  // Bundle Mapbox with the app instead of downloading its runtime from a CDN.
+  // This is substantially more reliable for installed iPhone PWAs.
+  const module = await import("mapbox-gl");
+  return module.default;
 }
 
 function miles(a: [number, number], b: [number, number]) {
@@ -220,51 +206,167 @@ function gpsEvent(detail: Record<string, unknown>) {
   window.dispatchEvent(new CustomEvent("route-trainer-gps", {detail}));
 }
 
-function sampleOrderedWaypoints(points: [number, number][], maximum: number) {
-  if (points.length <= maximum) return points;
-  return Array.from({length:maximum}, (_, index) => points[Math.round(index * (points.length - 1) / (maximum - 1))])
-    .filter((point, index, sampled) => index === 0 || point !== sampled[index - 1]);
+type MapboxVoiceInstruction = {
+  distanceAlongGeometry: number;
+  announcement: string;
+  ssmlAnnouncement?: string;
+};
+
+type MapboxGuidanceStep = {
+  coordinates: [number, number];
+  instruction: string;
+  modifier: string;
+  type: string;
+  progress: number;
+  voiceInstructions: MapboxVoiceInstruction[];
+};
+
+type MapboxGuidancePlan = {
+  steps: MapboxGuidanceStep[];
+  geometry: [number, number][];
+};
+
+// Keep the route constrained to the official transit shape while staying
+// within the Directions API's 25-coordinate limit. Sharp bends are retained;
+// long straight sections need no extra shaping points.
+function routeShapingPoints(route: [number, number][]) {
+  const lengths = routeLengths(route);
+  const points: [number, number][] = [route[0]];
+  let lastProgress = 0;
+  for (let i = 2; i < route.length - 2; i++) {
+    const angle = headingDifference(bearing(route[i - 2], route[i]), bearing(route[i], route[i + 2]));
+    const progress = lengths[i];
+    if (angle >= 24 && progress - lastProgress >= .012) {
+      points.push(route[i]);
+      lastProgress = progress;
+    } else if (progress - lastProgress >= .75) {
+      points.push(route[i]);
+      lastProgress = progress;
+    }
+  }
+  points.push(route[route.length - 1]);
+  return points.filter((point, index, all) => index === 0 || miles(point, all[index - 1]) > .002);
 }
 
-function appleMapsRouteUrl(source: [number, number], destination: [number, number], waypoints: [number, number][]) {
-  const coordinate = ([longitude, latitude]: [number, number]) => `${latitude.toFixed(6)},${longitude.toFixed(6)}`;
-  const parameters = new URLSearchParams({
-    source:coordinate(source),
-    destination:coordinate(destination),
-    mode:"driving",
-    start:"3",
-  });
-  waypoints.forEach(point => parameters.append("waypoint", coordinate(point)));
-  return `https://maps.apple.com/directions?${parameters.toString()}`;
+function chunkShapingPoints(points: [number, number][]) {
+  if (points.length <= 25) return [points];
+  const chunks: [number, number][][] = [];
+  for (let start = 0; start < points.length - 1; start += 24) {
+    chunks.push(points.slice(start, Math.min(start + 25, points.length)));
+  }
+  return chunks;
 }
 
-function googleMapsRouteUrl(source: [number, number], destination: [number, number], waypoints: [number, number][]) {
-  const coordinate = ([longitude, latitude]: [number, number]) => `${latitude.toFixed(6)},${longitude.toFixed(6)}`;
-  const parameters = new URLSearchParams({
-    api:"1",
-    origin:coordinate(source),
-    destination:coordinate(destination),
-    travelmode:"driving",
-    dir_action:"navigate",
-  });
-  if (waypoints.length) parameters.set("waypoints", waypoints.map(coordinate).join("|"));
-  return `https://www.google.com/maps/dir/?${parameters.toString()}`;
+function directionsCacheKey(routeNumber: string, direction: string) {
+  return `rt-mapbox-directions-v2:${routeNumber}:${direction}`;
 }
+
+async function fetchMapboxGuidance(
+  routeNumber: string,
+  direction: string,
+  officialRoute: [number, number][],
+  officialLengths: number[],
+): Promise<MapboxGuidancePlan> {
+  const cacheKey = directionsCacheKey(routeNumber, direction);
+  try {
+    const cached = JSON.parse(localStorage.getItem(cacheKey) || "null");
+    if (cached?.savedAt > Date.now() - 7 * 86400000 && Array.isArray(cached?.plan?.steps)) return cached.plan;
+  } catch { /* Ignore an unavailable or invalid browser cache. */ }
+
+  const chunks = chunkShapingPoints(routeShapingPoints(officialRoute));
+  const allSteps: MapboxGuidanceStep[] = [];
+  const geometry: [number, number][] = [];
+  for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+    const chunk = chunks[chunkIndex];
+    const coordinates = chunk.map(point => point.join(",")).join(";");
+    const parameters = new URLSearchParams({
+      access_token:TOKEN,
+      alternatives:"false",
+      steps:"true",
+      voice_instructions:"true",
+      banner_instructions:"true",
+      voice_units:"imperial",
+      geometries:"geojson",
+      overview:"full",
+      continue_straight:"true",
+      waypoints:`0;${chunk.length - 1}`,
+    });
+    const response = await fetch(`https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?${parameters}`);
+    if (!response.ok) throw new Error(`Mapbox directions failed (${response.status})`);
+    const data = await response.json();
+    const route = data?.routes?.[0];
+    const rawGeometry = route?.geometry?.coordinates as [number, number][] | undefined;
+    const rawSteps = route?.legs?.[0]?.steps as any[] | undefined;
+    if (!Array.isArray(rawGeometry) || rawGeometry.length < 2 || !Array.isArray(rawSteps)) throw new Error("Mapbox returned no guidance");
+
+    // Reject a route if Mapbox left the official bus alignment. The tolerance
+    // allows divided roads and terminal driveways without permitting shortcuts.
+    const generatedLengths = routeLengths(rawGeometry);
+    const generatedSamples = rawGeometry.filter((_, index) => index % 8 === 0 || index === rawGeometry.length - 1);
+    const maximumDeviation = Math.max(...generatedSamples.map(point => projectOnRoute(point, officialRoute, officialLengths).distance));
+    const chunkStart = projectOnRoute(chunk[0], officialRoute, officialLengths).along;
+    const chunkEnd = projectOnRoute(chunk[chunk.length - 1], officialRoute, officialLengths, {referenceAlong:chunkStart}).along;
+    const officialSamples = officialRoute.filter((point, index) => {
+      if (index % 10 !== 0 && index !== officialRoute.length - 1) return false;
+      const progress = officialLengths[index];
+      return progress >= chunkStart - .02 && progress <= chunkEnd + .02;
+    });
+    const reverseDeviation = Math.max(...officialSamples.map(point => projectOnRoute(point, rawGeometry, generatedLengths).distance));
+    if (maximumDeviation > .20 || reverseDeviation > .24) throw new Error("Mapbox route did not match the official bus alignment");
+
+    geometry.push(...rawGeometry.slice(chunkIndex ? 1 : 0));
+    for (let stepIndex = 1; stepIndex < rawSteps.length; stepIndex++) {
+      const step = rawSteps[stepIndex];
+      const isIntermediateArrival = chunkIndex < chunks.length - 1 && step?.maneuver?.type === "arrive";
+      if (isIntermediateArrival) continue;
+      const location = step?.maneuver?.location;
+      if (!Array.isArray(location)) continue;
+      const coordinates: [number, number] = [Number(location[0]), Number(location[1])];
+      const progress = projectOnRoute(coordinates, officialRoute, officialLengths).along;
+      const previous = rawSteps[stepIndex - 1];
+      allSteps.push({
+        coordinates,
+        instruction:String(step?.maneuver?.instruction || "Continue on the route"),
+        modifier:String(step?.maneuver?.modifier || "straight"),
+        type:String(step?.maneuver?.type || "continue"),
+        progress,
+        voiceInstructions:Array.isArray(previous?.voiceInstructions) ? previous.voiceInstructions : [],
+      });
+    }
+  }
+  const steps = allSteps
+    .filter((step, index, all) => index === 0 || step.progress > all[index - 1].progress + .002)
+    .sort((a, b) => a.progress - b.progress);
+  if (!steps.length) throw new Error("Mapbox returned no usable maneuvers");
+  const plan = {steps, geometry};
+  try { localStorage.setItem(cacheKey, JSON.stringify({savedAt:Date.now(), plan})); } catch { /* Cache is optional. */ }
+  return plan;
+}
+
+const liveMapCleanups = new Map<HTMLElement, () => void>();
 
 async function mountLiveMap(host: HTMLElement) {
   if (host.dataset.enhanced) return;
+  const runtime = host.querySelector<HTMLElement>(".map-runtime");
+  if (!runtime) return;
   host.dataset.enhanced = "true";
   const routeNumber = host.dataset.route || "11";
   const route30South = routeNumber === "30" && host.dataset.direction === "southbound";
+  const route3South = routeNumber === "3" && host.dataset.direction === "southbound";
   const route11East = routeNumber === "11" && host.dataset.direction === "eastbound";
   const route4East = routeNumber === "4" && host.dataset.direction === "eastbound";
   const route30Turns = route30South ? ROUTE30_SOUTH_TURNS : ROUTE30_NORTH_TURNS;
+  const route3Stops = route3South ? ROUTE3_SOUTH_STOPS : ROUTE3_NORTH_STOPS;
+  const route3Shape = route3South ? ROUTE3_SOUTH_SHAPE : ROUTE3_NORTH_SHAPE;
   const route30Stops = route30South ? OFFICIAL_ROUTE30_SOUTH_STOPS : OFFICIAL_ROUTE30_NORTH_STOPS;
   const route30Shape = route30South ? ROUTE30_SOUTH_SHAPE : ROUTE30_NORTH_SHAPE;
   const route11Stops = route11East ? ROUTE11_EAST_STOPS : ROUTE11_WEST_STOPS;
   const route11Shape = route11East ? ROUTE11_EAST_SHAPE : ROUTE11_WEST_SHAPE;
   const route4Stops = route4East ? ROUTE4_EAST_STOPS : ROUTE4_WEST_STOPS;
   const route4Shape = route4East ? ROUTE4_EAST_SHAPE : ROUTE4_WEST_SHAPE;
+  const route14East = routeNumber === "14" && host.dataset.direction === "eastbound";
+  const route14Stops = route14East ? ROUTE14_EAST_STOPS : ROUTE14_WEST_STOPS;
+  const route14Shape = route14East ? ROUTE14_EAST_SHAPE : ROUTE14_WEST_SHAPE;
   const route35South = routeNumber === "35" && host.dataset.direction === "southbound";
   const route35Stops = route35South ? ROUTE35_SOUTH_STOPS : ROUTE35_NORTH_STOPS;
   const route35Shape = route35South ? ROUTE35_SOUTH_SHAPE : ROUTE35_NORTH_SHAPE;
@@ -284,20 +386,40 @@ async function mountLiveMap(host: HTMLElement) {
   const route26Clockwise = routeNumber === "26" && host.dataset.direction === "clockwise";
   const route26Shape = route26Clockwise ? [...ROUTE26_LOOP_SHAPE].reverse() : ROUTE26_LOOP_SHAPE;
   const route26Stops = route26Clockwise ? [...ROUTE26_LOOP_STOPS].reverse() : ROUTE26_LOOP_STOPS;
-  const mapCoordinates = routeNumber === "30" ? route30Shape : routeNumber === "4" ? route4Shape : routeNumber === "35" ? route35Shape : routeNumber === "36" ? route36Shape : routeNumber === "26" ? route26Shape : routeNumber === "15" ? route15Shape : routeNumber === "55" ? route55Shape : routeNumber === "95" ? route95Shape : route11Shape;
-  const checkpoints = routeNumber === "30"
+  const mapCoordinates = routeNumber === "3" ? route3Shape : routeNumber === "30" ? route30Shape : routeNumber === "4" ? route4Shape : routeNumber === "14" ? route14Shape : routeNumber === "35" ? route35Shape : routeNumber === "36" ? route36Shape : routeNumber === "26" ? route26Shape : routeNumber === "15" ? route15Shape : routeNumber === "55" ? route55Shape : routeNumber === "95" ? route95Shape : route11Shape;
+  let checkpoints = routeNumber === "30"
     ? route30Turns.map(point => point.coordinates)
     : routeNumber === "95" ? (route95Am ? ROUTE95_AM_TURNS : ROUTE95_PM_TURNS)
     : calibratedCheckpoints(mapCoordinates, maneuverCount);
   const cumulativeRouteLengths = routeLengths(mapCoordinates);
-  const checkpointProgress = orderedCheckpointProgress(checkpoints, mapCoordinates, cumulativeRouteLengths);
-  const stops: MapPoint[] = routeNumber === "30"
+  let checkpointProgress = orderedCheckpointProgress(checkpoints, mapCoordinates, cumulativeRouteLengths);
+  let navigationPlan: MapboxGuidancePlan | null = null;
+  const stops: MapPoint[] = routeNumber === "3"
+    ? route3Stops
+    : routeNumber === "30"
     ? route30Stops
-    : routeNumber === "4" ? route4Stops : routeNumber === "35" ? route35Stops : routeNumber === "36" ? route36Stops : routeNumber === "26" ? route26Stops : routeNumber === "15" ? route15Stops : routeNumber === "55" ? route55Stops : routeNumber === "95" ? route95Stops : route11Stops;
+    : routeNumber === "4" ? route4Stops : routeNumber === "14" ? route14Stops : routeNumber === "35" ? route35Stops : routeNumber === "36" ? route36Stops : routeNumber === "26" ? route26Stops : routeNumber === "15" ? route15Stops : routeNumber === "55" ? route55Stops : routeNumber === "95" ? route95Stops : route11Stops;
+  const fallbackMap = document.createElement("img");
+  fallbackMap.className = "map-fallback-basemap";
+  fallbackMap.alt = `Street map for Route ${routeNumber}`;
+  fallbackMap.decoding = "async";
+  const sampleEvery = Math.max(1, Math.ceil(mapCoordinates.length / 70));
+  const sampledRoute = mapCoordinates.filter((_, index) => index % sampleEvery === 0);
+  if (sampledRoute.at(-1) !== mapCoordinates.at(-1)) sampledRoute.push(mapCoordinates.at(-1)!);
+  const fallbackOverlay = {
+    type: "FeatureCollection",
+    features: [
+      { type: "Feature", properties: { stroke: "#17263a", "stroke-width": 9, "stroke-opacity": 1 }, geometry: { type: "LineString", coordinates: sampledRoute } },
+      { type: "Feature", properties: { stroke: "#efb81d", "stroke-width": 5, "stroke-opacity": 1 }, geometry: { type: "LineString", coordinates: sampledRoute } },
+      { type: "Feature", properties: { "marker-color": "#ffffff", "marker-size": "small", "marker-symbol": "bus" }, geometry: { type: "MultiPoint", coordinates: stops.map(stop => stop.coordinates) } },
+    ],
+  };
+  fallbackMap.src = `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/geojson(${encodeURIComponent(JSON.stringify(fallbackOverlay))})/auto/1280x640@2x?padding=45&access_token=${TOKEN}`;
+  runtime.appendChild(fallbackMap);
   const fallback = document.createElement("canvas");
   fallback.className = "route-canvas";
   fallback.setAttribute("aria-label", `Route ${routeNumber} path`);
-  host.prepend(fallback);
+  runtime.appendChild(fallback);
   const drawFallback = () => {
     const ratio = Math.min(window.devicePixelRatio || 1, 2), rect = host.getBoundingClientRect();
     fallback.width = Math.max(1, Math.round(rect.width * ratio)); fallback.height = Math.max(1, Math.round(rect.height * ratio));
@@ -306,16 +428,18 @@ async function mountLiveMap(host: HTMLElement) {
     const point = (p: [number, number]) => [pad + (p[0]-minX)/(maxX-minX)*(rect.width-pad*2), pad + (maxY-p[1])/(maxY-minY)*(rect.height-pad*2)] as const;
     const paint = (color:string,width:number) => {ctx.beginPath();mapCoordinates.forEach((p,i)=>{const [x,y]=point(p);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.strokeStyle=color;ctx.lineWidth=width;ctx.lineJoin="round";ctx.lineCap="round";ctx.stroke()};
     paint("#17263a",7); paint("#efb81d",4);
-    checkpoints.forEach((p,i)=>{const[x,y]=point(p);ctx.beginPath();ctx.arc(x,y,i===0||i===checkpoints.length-1?7:4,0,Math.PI*2);ctx.fillStyle=i===0?"#148b63":i===checkpoints.length-1?"#d65572":"#fff";ctx.fill();ctx.strokeStyle="#17263a";ctx.lineWidth=2;ctx.stroke()});
+    stops.forEach((stop,i)=>{const[x,y]=point(stop.coordinates);ctx.beginPath();ctx.arc(x,y,i===0||i===stops.length-1?7:3,0,Math.PI*2);ctx.fillStyle=i===0?"#148b63":i===stops.length-1?"#d65572":"#fff";ctx.fill();ctx.strokeStyle="#17263a";ctx.lineWidth=i===0||i===stops.length-1?2:1.5;ctx.stroke()});
   };
-  drawFallback(); new ResizeObserver(drawFallback).observe(host);
+  drawFallback();
+  const fallbackResizeObserver = new ResizeObserver(drawFallback);
+  fallbackResizeObserver.observe(host);
   const mapNode = document.createElement("div");
   mapNode.className = "mapbox-canvas";
-  host.prepend(mapNode);
+  runtime.appendChild(mapNode);
   const gpsButton = document.createElement("button");
   gpsButton.className = "gps-button";
   gpsButton.textContent = "⌖ Use phone GPS";
-  host.appendChild(gpsButton);
+  runtime.appendChild(gpsButton);
   const details = document.createElement("div");
   details.className = "avl-details";
   details.innerHTML = `<span>GPS <b class="avl-accuracy">—</b></span><span>UPDATED <b class="avl-updated">—</b></span>`;
@@ -324,51 +448,44 @@ async function mountLiveMap(host: HTMLElement) {
   centerButton.className = "center-bus";
   centerButton.textContent = "Center on bus";
   details.appendChild(centerButton);
-  const appleMapsButton = document.createElement("button");
-  appleMapsButton.type = "button";
-  appleMapsButton.className = "apple-maps-button";
-  appleMapsButton.textContent = "Start Apple Maps navigation";
-  details.appendChild(appleMapsButton);
-  const googleMapsButton = document.createElement("button");
-  googleMapsButton.type = "button";
-  googleMapsButton.className = "google-maps-button";
-  googleMapsButton.textContent = "Start Google Maps navigation";
-  details.appendChild(googleMapsButton);
-  const appleMapsNote = document.createElement("small");
-  appleMapsNote.className = "apple-maps-note";
-  appleMapsNote.textContent = "Choose Apple or Google for spoken driving guidance. Route Trainer alerts may pause while another navigation app is open.";
-  details.appendChild(appleMapsNote);
-  host.parentElement?.querySelector(".live-panel")?.prepend(details);
+  host.parentElement?.querySelector(".avl-runtime")?.appendChild(details);
   let busPosition: [number, number] = mapCoordinates[0];
-  let currentRouteProgress = 0;
-  appleMapsButton.onclick = () => {
-    const destination = mapCoordinates[mapCoordinates.length - 1];
-    const remainingTurns = checkpoints.filter((point, index) =>
-      checkpointProgress[index] > currentRouteProgress + .01 && miles(point, destination) > .03
-    );
-    const previewUrl = appleMapsRouteUrl(busPosition, destination, sampleOrderedWaypoints(remainingTurns, 8));
-    window.location.assign(previewUrl);
-  };
-  googleMapsButton.onclick = () => {
-    const destination = mapCoordinates[mapCoordinates.length - 1];
-    const remainingTurns = checkpoints.filter((point, index) =>
-      checkpointProgress[index] > currentRouteProgress + .01 && miles(point, destination) > .03
-    );
-    const navigationUrl = googleMapsRouteUrl(busPosition, destination, sampleOrderedWaypoints(remainingTurns, 3));
-    window.location.assign(navigationUrl);
-  };
   try {
     const mapboxgl = await loadMapbox();
+    if (!host.isConnected) { fallbackResizeObserver.disconnect(); return; }
+    if (typeof mapboxgl.supported === "function" && !mapboxgl.supported()) throw new Error("WebGL map unavailable");
     mapboxgl.accessToken = TOKEN;
-    const map = new mapboxgl.Map({ container: mapNode, style: "mapbox://styles/mapbox/streets-v12", center: [-95.974, 41.251], zoom: 11.7, attributionControl: true, interactive: true, dragPan: true, scrollZoom: true, touchZoomRotate: true, doubleClickZoom: true });
+    const map = new mapboxgl.Map({ container: mapNode, style: "mapbox://styles/mapbox/streets-v12", center: [-95.974, 41.251], zoom: 11.7, attributionControl: true, interactive: true, dragPan: true, scrollZoom: true, touchZoomRotate: true, doubleClickZoom: true, antialias: false });
+    let mapLoaded = false;
+    const showFallback = () => {
+      if (mapLoaded) return;
+      host.dataset.mapReady = "false";
+      host.dataset.mapFallback = "true";
+      mapNode.style.display = "none";
+      gpsButton.textContent = "Map fallback · GPS ready";
+    };
+    const loadTimeout = window.setTimeout(showFallback, 10000);
+    map.getCanvas().addEventListener("webglcontextlost", event => { event.preventDefault(); mapLoaded = false; showFallback(); });
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false, visualizePitch: false }), "bottom-right");
     map.dragPan.enable(); map.scrollZoom.enable(); map.touchZoomRotate.enable(); map.doubleClickZoom.enable();
+    const guidancePromise = fetchMapboxGuidance(routeNumber, host.dataset.direction || "", mapCoordinates, cumulativeRouteLengths)
+      .then(plan => {
+        navigationPlan = plan;
+        checkpoints = plan.steps.map(step => step.coordinates);
+        checkpointProgress = plan.steps.map(step => step.progress);
+        gpsEvent({type:"navigation-ready", total:plan.steps.length, provider:"Mapbox"});
+        return plan;
+      })
+      .catch(() => {
+        gpsEvent({type:"navigation-fallback", total:checkpoints.length});
+        return null;
+      });
     const busMarkerElement = document.createElement("div");
     busMarkerElement.className = "live-bus-marker";
     busMarkerElement.setAttribute("role", "img");
     busMarkerElement.setAttribute("aria-label", `Route ${routeNumber} bus location`);
     const busMarkerImage = document.createElement("img");
-    busMarkerImage.src = "https://route-11-trainer.joshuaefigenio.chatgpt.site/metro-bus-marker.png";
+    busMarkerImage.src = "/metro-bus-marker.png";
     busMarkerImage.alt = "";
     busMarkerImage.draggable = false;
     busMarkerElement.appendChild(busMarkerImage);
@@ -380,9 +497,14 @@ async function mountLiveMap(host: HTMLElement) {
     let trackUp = false;
     let latestTravelHeading: number | null = null;
     let trackUpButton: HTMLButtonElement | null = null;
+    let renderedBusPosition: [number, number] = [...busPosition];
+    let markerAnimationFrame: number | null = null;
+    const normalizeHeading = (value: number) => (value % 360 + 360) % 360;
     const focusBusOnMap = (target: [number, number], zoom: number, duration: number) => {
-      if (!followBus) return;
-      const options: { center: [number, number]; zoom: number; duration: number; bearing?: number } = { center: target, zoom, duration };
+      if (!followBus || !mapLoaded) return;
+      const options: { center: [number, number]; zoom: number; duration: number; easing?: (value: number) => number; bearing?: number } = {
+        center: target, zoom, duration,
+      };
       if (trackUp && latestTravelHeading != null) options.bearing = latestTravelHeading;
       map.easeTo(options);
     };
@@ -394,7 +516,7 @@ async function mountLiveMap(host: HTMLElement) {
       trackUpButton.title = trackUp ? "Track Up is on" : "Turn Track Up on";
       trackUpButton.textContent = trackUp ? "↑ Track" : "N ↑";
     };
-    map.addControl({
+    const trackUpControl = {
       onAdd() {
         const container = document.createElement("div");
         container.className = "mapboxgl-ctrl mapboxgl-ctrl-group track-up-group";
@@ -405,18 +527,79 @@ async function mountLiveMap(host: HTMLElement) {
           trackUp = !trackUp;
           followBus = true;
           refreshTrackUpButton();
-          map.easeTo({ center: busPosition, zoom: Math.max(map.getZoom(), 14.5), bearing: trackUp && latestTravelHeading != null ? latestTravelHeading : 0, duration: 450 });
+          const bearing = trackUp && latestTravelHeading != null ? latestTravelHeading : 0;
+          map.easeTo({ center: renderedBusPosition, zoom: Math.max(map.getZoom(), 14.5), bearing, duration: 450 });
         });
         refreshTrackUpButton();
         container.appendChild(trackUpButton);
         return container;
       },
-      onRemove() { trackUpButton = null; },
-    }, "bottom-right");
-    centerButton.onclick = () => { followBus = true; focusBusOnMap(busPosition, Math.max(map.getZoom(), 14.5), 500); };
+      onRemove() {
+        trackUpButton = null;
+      },
+    };
+    map.addControl(trackUpControl, "bottom-right");
+    liveMapCleanups.set(host, () => {
+      window.clearTimeout(loadTimeout);
+      fallbackResizeObserver.disconnect();
+      if (markerAnimationFrame != null) cancelAnimationFrame(markerAnimationFrame);
+      if (window.__routeTrainerWatch != null) {
+        navigator.geolocation?.clearWatch(window.__routeTrainerWatch);
+        window.__routeTrainerWatch = undefined;
+      }
+      window.__startRouteGPS = undefined;
+      try { map.remove(); } catch { /* Map may already be unavailable. */ }
+    });
+    let markerHasLiveFix = false;
+    const moveBusMarkerSmoothly = (
+      target: [number, number],
+      options: { accuracyMeters?: number; moving?: boolean; duration?: number } = {},
+    ) => {
+      if (!Number.isFinite(target[0]) || !Number.isFinite(target[1])) return;
+      busPosition = [...target];
+      const distanceToTarget = miles(renderedBusPosition, target);
+      const jitterThreshold = Math.min(.012, Math.max(.0025, (options.accuracyMeters ?? 10) * .000621371 * .18));
+      if (markerHasLiveFix && !options.moving && distanceToTarget < jitterThreshold) return;
+      if (markerAnimationFrame != null) cancelAnimationFrame(markerAnimationFrame);
+      const source: [number, number] = [...renderedBusPosition];
+      const duration = distanceToTarget > .5 || !markerHasLiveFix ? 0 : Math.max(650, Math.min(1500, options.duration ?? 1050));
+      markerHasLiveFix = true;
+      if (duration === 0) {
+        renderedBusPosition = [...target];
+        busMarker.setLngLat(renderedBusPosition);
+        focusBusOnMap(target, 15.5, 650);
+        return;
+      }
+      const startedAt = performance.now();
+      const animate = (timestamp: number) => {
+        if (!host.isConnected) { markerAnimationFrame = null; return; }
+        const progress = Math.min(1, (timestamp - startedAt) / duration);
+        renderedBusPosition = [
+          source[0] + (target[0] - source[0]) * progress,
+          source[1] + (target[1] - source[1]) * progress,
+        ];
+        busMarker.setLngLat(renderedBusPosition);
+        if (progress < 1) markerAnimationFrame = requestAnimationFrame(animate);
+        else markerAnimationFrame = null;
+      };
+      markerAnimationFrame = requestAnimationFrame(animate);
+      focusBusOnMap(target, 15.5, duration);
+    };
+    centerButton.onclick = () => {
+      followBus = true;
+      focusBusOnMap(renderedBusPosition, Math.max(map.getZoom(), 14.5), 650);
+    };
     map.on("dragstart", () => { followBus = false; });
     map.on("zoomstart", (event: any) => { if (event.originalEvent) followBus = false; });
     map.on("load", async () => {
+      map.resize();
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      map.resize();
+      const mapRect = mapNode.getBoundingClientRect();
+      if (mapRect.width < 100 || mapRect.height < 100 || map.getCanvas().width < 100 || map.getCanvas().height < 100) {
+        showFallback();
+        return;
+      }
       const routeData = { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: mapCoordinates } };
       const stopData = { type: "FeatureCollection", features: stops.map((stop, i) => ({ type: "Feature", properties: { name: stop.name, number: i + 1 }, geometry: { type: "Point", coordinates: stop.coordinates } })) };
       const turnData = { type: "FeatureCollection", features: routeNumber === "30" ? route30Turns.map((turn, i) => ({ type: "Feature", properties: { name: turn.name, number: i + 1 }, geometry: { type: "Point", coordinates: turn.coordinates } })) : [] };
@@ -444,31 +627,41 @@ async function mountLiveMap(host: HTMLElement) {
         stopEl.type = "button"; stopEl.title = stop.name; stopEl.setAttribute("aria-label", `Stop ${i + 1}: ${stop.name}`); stopEl.innerHTML = `<span>${i + 1}</span><small>${stop.name}</small>`;
         new mapboxgl.Marker({ element: stopEl, anchor: "center" }).setLngLat(stop.coordinates).addTo(map);
       });
+      mapLoaded = true;
+      window.clearTimeout(loadTimeout);
       host.dataset.mapReady = "true";
+      host.dataset.mapFallback = "false";
       const bounds = mapCoordinates.reduce((b: any, p) => b.extend(p), new mapboxgl.LngLatBounds(mapCoordinates[0], mapCoordinates[0]));
       map.fitBounds(bounds, { padding: 45, duration: 0 });
+      requestAnimationFrame(() => map.resize());
     });
-    const startGps = () => {
+    const startGps = async () => {
       if (!navigator.geolocation) { gpsButton.textContent = "GPS unavailable"; return; }
       gpsButton.textContent = "Locating…";
       let targetIndex = 0, promptStage = 0, completionFixes = 0, offRouteFixes = 0, onRouteFixes = 0, offRouteAnnounced = false;
       let initialized = false, headingLocked = false, lastPosition: [number, number] | null = null, lastRouteSegment = 1, lastAlong: number | null = null;
       let fixCount = 0, wrongWayFixes = 0, wrongWayAnnounced = false, weakGpsAnnounced = false;
       let mapMatchedPosition: [number, number] | null = null, mapMatchedAt = 0, mapMatchInFlight = false, lastMapMatchRequest = 0;
+      let lastMarkerFixAt = 0;
       const gpsTrace: {coordinates:[number,number]; accuracy:number; timestamp:number}[] = [];
       const announcedStops = new Set<number>();
+      const spokenMapboxVoices = new Set<string>();
       followBus = true;
       // Fired synchronously from the Start live GPS tap. This unlocks spoken
       // guidance on iPhone Safari before asynchronous location fixes arrive.
       gpsEvent({type:"start"});
+      await guidancePromise;
       if (window.__routeTrainerWatch != null) navigator.geolocation.clearWatch(window.__routeTrainerWatch);
       window.__routeTrainerWatch = navigator.geolocation.watchPosition(position => {
         const rawCurrent: [number, number] = [position.coords.longitude, position.coords.latitude];
         const moved = lastPosition ? miles(lastPosition, rawCurrent) : 0;
+        const moving = (position.coords.speed ?? 0) > 1.5 || moved > .004;
         const movementHeading = Number.isFinite(position.coords.heading) && position.coords.heading != null
-          ? (position.coords.heading % 360 + 360) % 360
+          ? normalizeHeading(position.coords.heading)
           : lastPosition && moved > .004 ? bearing(lastPosition, rawCurrent) : null;
         if (movementHeading != null) latestTravelHeading = movementHeading;
+        const markerDuration = lastMarkerFixAt ? Math.max(700, Math.min(1400, position.timestamp - lastMarkerFixAt + 200)) : 0;
+        lastMarkerFixAt = position.timestamp;
         gpsTrace.push({coordinates:rawCurrent, accuracy:Math.min(50, Math.max(5, position.coords.accuracy)), timestamp:Math.floor(position.timestamp / 1000)});
         if (gpsTrace.length > 8) gpsTrace.shift();
         const now = Date.now();
@@ -486,15 +679,19 @@ async function mountLiveMap(host: HTMLElement) {
               const snapped: [number,number] = [Number(candidate[0]), Number(candidate[1])];
               if (!Number.isFinite(snapped[0]) || !Number.isFinite(snapped[1]) || miles(rawCurrent, snapped) > .18) return;
               mapMatchedPosition = snapped; mapMatchedAt = Date.now();
-              busPosition = snapped; busMarker.setLngLat(snapped);
-              focusBusOnMap(snapped, 15.5, 350);
+              moveBusMarkerSmoothly(snapped, { accuracyMeters: position.coords.accuracy, moving, duration: markerDuration });
             })
             .catch(() => { /* Raw high-accuracy GPS remains the safe fallback. */ })
             .finally(() => { mapMatchInFlight = false; });
         }
-        const mapMatchFresh = mapMatchedPosition && now - mapMatchedAt < 9000;
-        const current: [number, number] = mapMatchFresh ? mapMatchedPosition! : rawCurrent;
-        busPosition = current; busMarker.setLngLat(current); focusBusOnMap(current, 15.5, 500);
+        // A snapped point represents only the latest trace sample. Reusing it
+        // for several seconds made the marker freeze and then jump.
+        const mapMatchFresh = Boolean(mapMatchedPosition && now - mapMatchedAt < 1800);
+        // The asynchronous matcher has already animated its own trace sample.
+        // New phone fixes must keep moving forward instead of reusing that
+        // older snapped coordinate.
+        const current: [number, number] = rawCurrent;
+        moveBusMarkerSmoothly(current, { accuracyMeters: position.coords.accuracy, moving, duration: markerDuration });
         fixCount += 1;
         const rawRouteMatch = projectOnRoute(rawCurrent, mapCoordinates, cumulativeRouteLengths, {heading:movementHeading});
         const globalMatch = projectOnRoute(current, mapCoordinates, cumulativeRouteLengths, {heading:movementHeading});
@@ -507,7 +704,6 @@ async function mountLiveMap(host: HTMLElement) {
         // pass of the same street while still allowing recovery after a gap.
         const resolvingHeading = initialized && !headingLocked && movementHeading != null;
         const routeMatch = !initialized || fixCount <= 4 || resolvingHeading || localMatch.distance > .25 ? globalMatch : localMatch;
-        currentRouteProgress = routeMatch.along;
         const reliableGps = position.coords.accuracy <= 55;
         if (!reliableGps && !weakGpsAnnounced) { weakGpsAnnounced = true; gpsEvent({type:"gps-weak"}); }
         if (reliableGps) weakGpsAnnounced = false;
@@ -515,13 +711,21 @@ async function mountLiveMap(host: HTMLElement) {
           const ahead = checkpointProgress.findIndex(progress => progress >= routeMatch.along + .01);
           targetIndex = ahead < 0 ? checkpoints.length - 1 : ahead;
           initialized = true;
-          gpsEvent({type:"acquired", index:targetIndex});
+          const guidance = navigationPlan?.steps[targetIndex];
+          if (guidance) {
+            const remainingMeters = Math.max(0, guidance.progress - routeMatch.along) * 1609.344;
+            guidance.voiceInstructions.forEach((voice, voiceIndex) => {
+              if (voice.distanceAlongGeometry >= remainingMeters) spokenMapboxVoices.add(`${targetIndex}:${voiceIndex}`);
+            });
+          }
+          gpsEvent({type:"acquired", index:targetIndex, total:navigationPlan?.steps.length, instruction:guidance?.instruction, modifier:guidance?.modifier, provider:navigationPlan?"Mapbox":"operator"});
         } else if (initialized && !headingLocked && movementHeading != null) {
           const corrected = checkpointProgress.findIndex(progress => progress >= routeMatch.along + .01);
           const correctedTarget = corrected < 0 ? checkpoints.length - 1 : corrected;
           if (Math.abs(correctedTarget - targetIndex) > 1) {
             targetIndex = correctedTarget; promptStage = 0; completionFixes = 0;
-            gpsEvent({type:"reacquired", index:targetIndex});
+            const guidance = navigationPlan?.steps[targetIndex];
+            gpsEvent({type:"reacquired", index:targetIndex, total:navigationPlan?.steps.length, instruction:guidance?.instruction, modifier:guidance?.modifier, provider:navigationPlan?"Mapbox":"operator"});
           }
           headingLocked = true;
         }
@@ -535,7 +739,6 @@ async function mountLiveMap(host: HTMLElement) {
         offRouteFixes = onRoute ? 0 : offRouteFixes + 1; onRouteFixes = onRoute ? onRouteFixes + 1 : 0;
         if (offRouteFixes >= 3 && !offRouteAnnounced) { offRouteAnnounced = true; gpsEvent({type:"off-route"}); }
         if (onRouteFixes >= 2 && offRouteAnnounced) { offRouteAnnounced = false; gpsEvent({type:"back-on-route"}); }
-        const moving = (position.coords.speed ?? 0) > 1.5 || moved > .004;
         const wrongWay = reliableGps && onRoute && moving && movementHeading != null && headingDifference(movementHeading, routeMatch.routeBearing) > 105;
         wrongWayFixes = wrongWay ? wrongWayFixes + 1 : 0;
         if (wrongWayFixes >= 3 && !wrongWayAnnounced) { wrongWayAnnounced = true; gpsEvent({type:"wrong-way"}); }
@@ -544,7 +747,19 @@ async function mountLiveMap(host: HTMLElement) {
         if (status) { status.textContent = onRoute ? "ON ROUTE" : "OFF ROUTE"; status.className = onRoute ? "tracking" : "off-route"; }
         gpsEvent({type:"status", status:onRoute ? "tracking" : "off-route"});
         if (distance) distance.textContent = `${maneuverDistance < .1 ? Math.round(maneuverDistance * 5280) + " ft" : maneuverDistance.toFixed(1) + " mi"}`;
-        if (reliableGps && onRoute && !wrongWay) {
+        if (navigationPlan && reliableGps && onRoute && !wrongWay) {
+          const guidance = navigationPlan.steps[targetIndex];
+          const remainingMeters = maneuverDistance * 1609.344;
+          const eligible = guidance?.voiceInstructions
+            .map((voice, voiceIndex) => ({voice, voiceIndex, key:`${targetIndex}:${voiceIndex}`}))
+            .filter(item => !spokenMapboxVoices.has(item.key) && remainingMeters <= item.voice.distanceAlongGeometry + 12)
+            .sort((a, b) => b.voice.distanceAlongGeometry - a.voice.distanceAlongGeometry);
+          const prompt = eligible?.[0];
+          if (prompt) {
+            spokenMapboxVoices.add(prompt.key);
+            gpsEvent({type:"mapbox-voice", index:targetIndex, total:navigationPlan.steps.length, instruction:guidance.instruction, modifier:guidance.modifier, announcement:prompt.voice.announcement});
+          }
+        } else if (!navigationPlan && reliableGps && onRoute && !wrongWay) {
           if (promptStage < 3 && maneuverDistance <= .035) { promptStage = 3; gpsEvent({type:"now", index:targetIndex, distance:maneuverDistance}); }
           else if (promptStage < 2 && maneuverDistance <= .12) { promptStage = 2; gpsEvent({type:"near", index:targetIndex, distance:maneuverDistance}); }
           else if (promptStage < 1 && maneuverDistance <= .50) { promptStage = 1; gpsEvent({type:"prepare", index:targetIndex, distance:maneuverDistance}); }
@@ -559,7 +774,8 @@ async function mountLiveMap(host: HTMLElement) {
           const completed = targetIndex;
           if (targetIndex < checkpoints.length - 1) { targetIndex += 1; promptStage = 0; completionFixes = 0; }
           else { promptStage = 4; completionFixes = 0; }
-          gpsEvent({type:"complete", index:completed, nextIndex:targetIndex, finished:completed === checkpoints.length - 1});
+          const nextGuidance = navigationPlan?.steps[targetIndex];
+          gpsEvent({type:"complete", index:completed, nextIndex:targetIndex, total:navigationPlan?.steps.length, finished:completed === checkpoints.length - 1, instruction:nextGuidance?.instruction, modifier:nextGuidance?.modifier, provider:navigationPlan?"Mapbox":"operator"});
         }
         const accuracy = document.querySelector<HTMLElement>(".avl-accuracy");
         const updated = document.querySelector<HTMLElement>(".avl-updated");
@@ -572,12 +788,19 @@ async function mountLiveMap(host: HTMLElement) {
     window.__startRouteGPS = startGps;
   } catch {
     mapNode.remove();
-    gpsButton.textContent = "Static map · simulation ready";
+    host.dataset.mapFallback = "true";
+    gpsButton.textContent = "Map fallback · GPS ready";
+    liveMapCleanups.set(host, () => fallbackResizeObserver.disconnect());
   }
 }
 
 if (typeof window !== "undefined") {
-  const scan = () => document.querySelectorAll<HTMLElement>(".live .map").forEach(mountLiveMap);
+  const scan = () => {
+    liveMapCleanups.forEach((cleanup, host) => {
+      if (!host.isConnected) { cleanup(); liveMapCleanups.delete(host); }
+    });
+    document.querySelectorAll<HTMLElement>(".live .map").forEach(mountLiveMap);
+  };
   new MutationObserver(scan).observe(document.documentElement, { childList: true, subtree: true });
   queueMicrotask(scan);
 }
@@ -587,6 +810,12 @@ import {
   ROUTE30_SOUTH_SHAPE,
   ROUTE30_SOUTH_STOPS as OFFICIAL_ROUTE30_SOUTH_STOPS,
 } from "./route30-official";
+import {
+  ROUTE3_NORTH_SHAPE,
+  ROUTE3_NORTH_STOPS,
+  ROUTE3_SOUTH_SHAPE,
+  ROUTE3_SOUTH_STOPS,
+} from "./route3-official";
 import {
   ROUTE11_EAST_SHAPE,
   ROUTE11_EAST_STOPS,
@@ -599,6 +828,12 @@ import {
   ROUTE4_WEST_SHAPE,
   ROUTE4_WEST_STOPS,
 } from "./route4-official";
+import {
+  ROUTE14_EAST_SHAPE,
+  ROUTE14_EAST_STOPS,
+  ROUTE14_WEST_SHAPE,
+  ROUTE14_WEST_STOPS,
+} from "./route14-official";
 import {
   ROUTE35_NORTH_SHAPE,
   ROUTE35_NORTH_STOPS,
