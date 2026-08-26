@@ -455,7 +455,24 @@ async function mountLiveMap(host: HTMLElement) {
     if (!host.isConnected) { fallbackResizeObserver.disconnect(); return; }
     if (typeof mapboxgl.supported === "function" && !mapboxgl.supported()) throw new Error("WebGL map unavailable");
     mapboxgl.accessToken = TOKEN;
-    const map = new mapboxgl.Map({ container: mapNode, style: "mapbox://styles/mapbox/streets-v12", center: [-95.974, 41.251], zoom: 11.7, attributionControl: true, interactive: true, dragPan: true, scrollZoom: true, touchZoomRotate: true, doubleClickZoom: true, antialias: false });
+    // Mapbox Standard keeps all route, stop, GPS, and touch behavior intact while
+    // presenting the same map in its native 3D building style.
+    const map = new mapboxgl.Map({
+      container: mapNode,
+      style: "mapbox://styles/mapbox/standard",
+      config: { basemap: { lightPreset: "day", show3dObjects: true } },
+      center: [-95.974, 41.251],
+      zoom: 11.7,
+      pitch: 52,
+      bearing: 0,
+      attributionControl: true,
+      interactive: true,
+      dragPan: true,
+      scrollZoom: true,
+      touchZoomRotate: true,
+      doubleClickZoom: true,
+      antialias: true,
+    });
     let mapLoaded = false;
     const showFallback = () => {
       if (mapLoaded) return;
