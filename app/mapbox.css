@@ -1,6 +1,7 @@
 .map{background-color:#d9d7d1;touch-action:auto;overflow:hidden}
 .route-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:2;filter:drop-shadow(0 3px 3px #17263a33);pointer-events:none}
 .mapbox-canvas{position:absolute;inset:0;z-index:3;opacity:0;transition:opacity .25s;touch-action:pan-x pan-y}
+.map-runtime>.mapbox-canvas.mapboxgl-map{position:absolute!important;inset:0!important;width:100%!important;height:100%!important}
 .map[data-map-ready=true] .mapbox-canvas{opacity:1}
 .map[data-map-ready=true]>.route-canvas,.map[data-map-ready=true]>.road,.map[data-map-ready=true]>.route-line,.map[data-map-ready=true]>.bus,.map[data-map-ready=true]>.street{display:none!important}
 .map .street{background:#ffffffe6;padding:3px 5px;border-radius:4px;font-weight:800;z-index:2}
