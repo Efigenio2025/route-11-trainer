@@ -363,7 +363,16 @@ async function mountLiveMap(host: HTMLElement) {
     const map = new mapboxgl.Map({ container: mapNode, style: "mapbox://styles/mapbox/streets-v12", center: [-95.974, 41.251], zoom: 11.7, attributionControl: true, interactive: true, dragPan: true, scrollZoom: true, touchZoomRotate: true, doubleClickZoom: true });
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false, visualizePitch: false }), "bottom-right");
     map.dragPan.enable(); map.scrollZoom.enable(); map.touchZoomRotate.enable(); map.doubleClickZoom.enable();
-    const busMarker = new mapboxgl.Marker({ color: "#17263a", scale: 0.85 })
+    const busMarkerElement = document.createElement("div");
+    busMarkerElement.className = "live-bus-marker";
+    busMarkerElement.setAttribute("role", "img");
+    busMarkerElement.setAttribute("aria-label", `Route ${routeNumber} bus location`);
+    const busMarkerImage = document.createElement("img");
+    busMarkerImage.src = "https://route-11-trainer.joshuaefigenio.chatgpt.site/metro-bus-marker.png";
+    busMarkerImage.alt = "";
+    busMarkerImage.draggable = false;
+    busMarkerElement.appendChild(busMarkerImage);
+    const busMarker = new mapboxgl.Marker({ element: busMarkerElement, anchor: "center" })
       .setLngLat(busPosition)
       .setPopup(new mapboxgl.Popup({ offset: 24 }).setText(`Route ${routeNumber} bus location`))
       .addTo(map);
