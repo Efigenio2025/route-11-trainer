@@ -519,6 +519,8 @@ async function mountLiveMap(host: HTMLElement) {
     let compassHandler: (event: Event) => void = () => {};
     let trackUpButton: HTMLButtonElement | null = null;
     let perspectiveButton: HTMLButtonElement | null = null;
+    let fullscreenButton: HTMLButtonElement | null = null;
+    let appFullscreen = false;
     let renderedBusPosition: [number, number] = [...busPosition];
     let markerAnimationFrame: number | null = null;
     const normalizeHeading = (value: number) => (value % 360 + 360) % 360;
@@ -578,6 +580,61 @@ async function mountLiveMap(host: HTMLElement) {
       perspectiveButton.title = perspective3d ? "3D perspective on — switch to 2D" : "2D perspective on — switch to 3D";
       perspectiveButton.textContent = perspective3d ? "3D" : "2D";
     };
+    const refreshFullscreenButton = () => {
+      if (!fullscreenButton) return;
+      const active = Boolean(document.fullscreenElement) || appFullscreen;
+      fullscreenButton.classList.toggle("is-active", active);
+      fullscreenButton.setAttribute("aria-pressed", String(active));
+      fullscreenButton.setAttribute("aria-label", active ? "Exit full-screen map" : "Open full-screen map");
+      fullscreenButton.title = active ? "Exit full-screen map" : "Open full-screen map";
+      fullscreenButton.textContent = active ? "×" : "⛶";
+    };
+    const syncFullscreen = () => {
+      if (document.fullscreenElement) appFullscreen = false;
+      host.classList.toggle("map-fullscreen", appFullscreen);
+      refreshFullscreenButton();
+      window.setTimeout(() => map.resize(), 80);
+    };
+    const fullscreenControl = {
+      onAdd() {
+        const container = document.createElement("div");
+        container.className = "mapboxgl-ctrl mapboxgl-ctrl-group fullscreen-group";
+        fullscreenButton = document.createElement("button");
+        fullscreenButton.type = "button";
+        fullscreenButton.className = "fullscreen-control";
+        fullscreenButton.addEventListener("click", async () => {
+          if (document.fullscreenElement === host) {
+            await document.exitFullscreen?.();
+            return;
+          }
+          if (appFullscreen) {
+            appFullscreen = false;
+            syncFullscreen();
+            return;
+          }
+          if (host.requestFullscreen) {
+            try {
+              await host.requestFullscreen();
+              return;
+            } catch { /* Use the iPhone-friendly fixed-position fallback below. */ }
+          }
+          appFullscreen = true;
+          syncFullscreen();
+        });
+        refreshFullscreenButton();
+        container.appendChild(fullscreenButton);
+        return container;
+      },
+      onRemove() {
+        fullscreenButton = null;
+      },
+    };
+    map.addControl(fullscreenControl, "bottom-right");
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    const onFullscreenKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && appFullscreen) { appFullscreen = false; syncFullscreen(); }
+    };
+    document.addEventListener("keydown", onFullscreenKey);
     const perspectiveControl = {
       onAdd() {
         const container = document.createElement("div");
@@ -613,6 +670,8 @@ async function mountLiveMap(host: HTMLElement) {
         window.removeEventListener("deviceorientation", compassHandler as EventListener);
         compassListening = false;
       }
+      document.removeEventListener("fullscreenchange", syncFullscreen);
+      document.removeEventListener("keydown", onFullscreenKey);
       window.__startRouteGPS = undefined;
       try { map.remove(); } catch { /* Map may already be unavailable. */ }
     });
