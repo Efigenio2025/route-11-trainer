@@ -219,7 +219,7 @@ export default function Home(){
  useEffect(()=>{const s=localStorage.getItem("rt-score");if(s)setScore(JSON.parse(s));const v=localStorage.getItem("rt-speech");if(v!==null){const enabled=v==="true";speechEnabledRef.current=enabled;setSpeech(enabled)}const stops=localStorage.getItem("rt-stop-alerts");if(stops!==null){const enabled=stops==="true";stopAlertsRef.current=enabled;setStopAlerts(enabled)}if("serviceWorker"in navigator)navigator.serviceWorker.register("/sw.js",{updateViaCache:"none"}).then(r=>r.update()).catch(()=>{})},[]);
  const speak=useCallback((text:string,options:{interrupt?:boolean;key?:string;force?:boolean}={})=>{if(typeof window==="undefined"||!("speechSynthesis"in window))return;if(!options.force&&!speechEnabledRef.current)return;const synth=window.speechSynthesis,key=options.key??text,now=Date.now(),last=spokenRef.current.get(key)??0;if(now-last<8000)return;spokenRef.current.set(key,now);const interrupt=options.interrupt!==false,sequence=interrupt?++speechSequenceRef.current:speechSequenceRef.current;if(synth.paused)synth.resume();if(interrupt)synth.cancel();const utterance=new SpeechSynthesisUtterance(text);utterance.lang="en-US";utterance.rate=.92;utterance.pitch=1;utterance.volume=1;const voice=synth.getVoices().find(v=>v.lang.toLowerCase().startsWith("en-us"));if(voice)utterance.voice=voice;const play=()=>{if(interrupt&&sequence!==speechSequenceRef.current)return;if(synth.paused)synth.resume();synth.speak(utterance)};if(interrupt)window.setTimeout(play,40);else play()},[]);
  useEffect(()=>{if(screen!=="live")return;const receive=(event:Event)=>{
-  const detail=(event as CustomEvent).detail as {type:string;status?:"tracking"|"off-route";index?:number;nextIndex?:number;finished?:boolean;stopName?:string;instruction?:string;modifier?:string;announcement?:string;total?:number;provider?:"Mapbox"|"operator"};
+  const detail=(event as CustomEvent).detail as {type:string;status?:"tracking"|"off-route";index?:number;nextIndex?:number;finished?:boolean;stopName?:string;stopNumber?:number;instruction?:string;modifier?:string;announcement?:string;total?:number;provider?:"Mapbox"|"operator"};
   const prefix=`${route.id}:${dir.id}`;
   if(detail.type==="status"&&detail.status)setLive(detail.status);
   if(detail.type==="start")speak("GPS guidance started. Locating you on the route.",{interrupt:false,key:`${prefix}:start`});
@@ -228,7 +228,7 @@ export default function Home(){
   if(detail.type==="back-on-route")speak(`You are back on Route ${route.number}.`,{key:`${prefix}:back-on-route`});
   if(detail.type==="wrong-way")speak(`You are traveling opposite the selected ${dir.label} direction. Turn around when safe.`,{key:`${prefix}:wrong-way`});
   if(detail.type==="direction-correct")speak(`Direction corrected. Continuing ${dir.label} guidance.`,{key:`${prefix}:direction-correct`});
-  if(detail.type==="stop-ahead"&&stopAlertsRef.current&&detail.stopName)speak(`Bus stop ahead in 300 feet. ${detail.stopName}.`,{interrupt:false,key:`${prefix}:stop:${detail.stopName}`});
+  if(detail.type==="stop-ahead"&&stopAlertsRef.current&&detail.stopName)speak(`Bus stop ${detail.stopNumber??""} ahead in 300 feet. ${detail.stopName}.`,{interrupt:false,key:`${prefix}:stop:${detail.stopNumber??detail.stopName}`});
   if(detail.type==="navigation-fallback")setLiveNavigation(null);
   if(detail.index==null)return;
   const key=`${prefix}:${detail.index}`;
