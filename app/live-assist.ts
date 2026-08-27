@@ -512,8 +512,10 @@ async function mountLiveMap(host: HTMLElement) {
       .addTo(map);
     let followBus = true;
     let trackUp = false;
+    let perspective3d = true;
     let latestTravelHeading: number | null = null;
     let trackUpButton: HTMLButtonElement | null = null;
+    let perspectiveButton: HTMLButtonElement | null = null;
     let renderedBusPosition: [number, number] = [...busPosition];
     let markerAnimationFrame: number | null = null;
     const normalizeHeading = (value: number) => (value % 360 + 360) % 360;
@@ -556,6 +558,36 @@ async function mountLiveMap(host: HTMLElement) {
       },
     };
     map.addControl(trackUpControl, "bottom-right");
+    const refreshPerspectiveButton = () => {
+      if (!perspectiveButton) return;
+      perspectiveButton.classList.toggle("is-active", perspective3d);
+      perspectiveButton.setAttribute("aria-pressed", String(perspective3d));
+      perspectiveButton.setAttribute("aria-label", perspective3d ? "Switch to 2D map" : "Switch to 3D map");
+      perspectiveButton.title = perspective3d ? "3D perspective on — switch to 2D" : "2D perspective on — switch to 3D";
+      perspectiveButton.textContent = perspective3d ? "3D" : "2D";
+    };
+    const perspectiveControl = {
+      onAdd() {
+        const container = document.createElement("div");
+        container.className = "mapboxgl-ctrl mapboxgl-ctrl-group perspective-group";
+        perspectiveButton = document.createElement("button");
+        perspectiveButton.type = "button";
+        perspectiveButton.className = "perspective-control";
+        perspectiveButton.addEventListener("click", () => {
+          perspective3d = !perspective3d;
+          refreshPerspectiveButton();
+          // Use a direct camera update so the selected view snaps into place.
+          map.jumpTo({ pitch: perspective3d ? 52 : 0 });
+        });
+        refreshPerspectiveButton();
+        container.appendChild(perspectiveButton);
+        return container;
+      },
+      onRemove() {
+        perspectiveButton = null;
+      },
+    };
+    map.addControl(perspectiveControl, "bottom-right");
     liveMapCleanups.set(host, () => {
       window.clearTimeout(loadTimeout);
       fallbackResizeObserver.disconnect();
