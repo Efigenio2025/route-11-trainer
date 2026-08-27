@@ -6,6 +6,7 @@ import "./routes.css";
 import "./avl.css";
 import "./live-assist";
 import {ROUTE3_NORTH_STOPS,ROUTE3_SOUTH_STOPS} from "./route3-official";
+import {ROUTE5_NORTH_STOPS,ROUTE5_SOUTH_STOPS} from "./route5-official";
 
 type Turn="left"|"right"|"continue";
 type Step={action:Turn;street:string;until:string;note?:string};
@@ -28,6 +29,8 @@ const officialRoute3Steps=(stops:{name:string;coordinates:[number,number]}[]):St
 });
 const route3NorthSteps=officialRoute3Steps(ROUTE3_NORTH_STOPS);
 const route3SouthSteps=officialRoute3Steps(ROUTE3_SOUTH_STOPS);
+const route5NorthSteps=officialRoute3Steps(ROUTE5_NORTH_STOPS);
+const route5SouthSteps=officialRoute3Steps(ROUTE5_SOUTH_STOPS);
 const routes:Route[]=[
  {id:"3",number:"3",name:"North 40th / South 42nd",subtitle:"22nd & Cuming ↔ North Omaha / MCC South",directions:[
   {id:"northbound",label:"Northbound",origin:"22nd & Cuming",destination:"North Omaha T.C.",steps:route3NorthSteps},
@@ -38,6 +41,10 @@ const routes:Route[]=[
    {action:"left",street:"Dodge",until:"16th Street"},{action:"left",street:"16th Street",until:"Howard"},{action:"right",street:"Howard",until:"St. Mary's",note:"Veer left onto St. Mary's, then continue to Leavenworth"},{action:"right",street:"Leavenworth",until:"60th Street"},{action:"left",street:"60th Street",until:"Pacific"},{action:"right",street:"Pacific",until:"67th Street"},{action:"left",street:"67th Street",until:"Pine"},{action:"right",street:"Pine",until:"Aksarben Drive"},{action:"left",street:"Aksarben Drive",until:"Mercy Road"},{action:"right",street:"Mercy Road",until:"Aksarben T.C."}]},
   {id:"eastbound",label:"Eastbound",origin:"Aksarben T.C.",destination:"11th Street layover",steps:[
    {action:"continue",street:"Mercy Road",until:"72nd Street"},{action:"right",street:"72nd Street",until:"Pine"},{action:"right",street:"Pine",until:"67th Street"},{action:"left",street:"67th Street",until:"Pacific"},{action:"right",street:"Pacific",until:"60th Street"},{action:"left",street:"60th Street",until:"Leavenworth"},{action:"right",street:"Leavenworth",until:"16th Street"},{action:"left",street:"16th Street",until:"Douglas"},{action:"right",street:"Douglas",until:"11th Street"},{action:"left",street:"11th Street",until:"Layover"}]}
+ ]},
+ {id:"5",number:"5",name:"90th Street",subtitle:"North Omaha Transit Center ↔ Westroads Transit Center",directions:[
+  {id:"northbound",label:"Northbound",origin:"North Omaha T.C.",destination:"Westroads T.C.",steps:route5NorthSteps},
+  {id:"southbound",label:"Southbound",origin:"Westroads T.C.",destination:"North Omaha T.C.",steps:route5SouthSteps}
  ]},
  {id:"30",number:"30",name:"Aksarben / North Omaha",subtitle:"Aksarben T.C. ↔ 31st & Ferry",directions:[
   {id:"northbound",label:"Northbound",origin:"Aksarben T.C.",destination:"31st & Ferry layover",steps:[
