@@ -520,6 +520,7 @@ async function mountLiveMap(host: HTMLElement) {
     let trackUpButton: HTMLButtonElement | null = null;
     let perspectiveButton: HTMLButtonElement | null = null;
     let fullscreenButton: HTMLButtonElement | null = null;
+    let centerMapButton: HTMLButtonElement | null = null;
     let appFullscreen = false;
     let renderedBusPosition: [number, number] = [...busPosition];
     let markerAnimationFrame: number | null = null;
@@ -572,6 +573,28 @@ async function mountLiveMap(host: HTMLElement) {
       },
     };
     map.addControl(trackUpControl, "bottom-right");
+    const centerMapControl = {
+      onAdd() {
+        const container = document.createElement("div");
+        container.className = "mapboxgl-ctrl mapboxgl-ctrl-group center-map-group";
+        centerMapButton = document.createElement("button");
+        centerMapButton.type = "button";
+        centerMapButton.className = "center-map-control";
+        centerMapButton.textContent = "⌾";
+        centerMapButton.title = "Center on bus";
+        centerMapButton.setAttribute("aria-label", "Center on bus");
+        centerMapButton.addEventListener("click", () => {
+          followBus = true;
+          focusBusOnMap(renderedBusPosition, Math.max(map.getZoom(), 14.5), 650);
+        });
+        container.appendChild(centerMapButton);
+        return container;
+      },
+      onRemove() {
+        centerMapButton = null;
+      },
+    };
+    map.addControl(centerMapControl, "bottom-right");
     const refreshPerspectiveButton = () => {
       if (!perspectiveButton) return;
       perspectiveButton.classList.toggle("is-active", perspective3d);
