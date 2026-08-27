@@ -442,7 +442,7 @@ async function mountLiveMap(host: HTMLElement) {
   runtime.appendChild(gpsButton);
   const details = document.createElement("div");
   details.className = "avl-details";
-  details.innerHTML = `<span>GPS <b class="avl-accuracy">—</b></span><span>UPDATED <b class="avl-updated">—</b></span>`;
+  details.innerHTML = `<span>GPS <b class="avl-accuracy">—</b></span><span>HEADING <b class="avl-heading">—</b></span><span>UPDATED <b class="avl-updated">—</b></span>`;
   const centerButton = document.createElement("button");
   centerButton.type = "button";
   centerButton.className = "center-bus";
@@ -519,6 +519,10 @@ async function mountLiveMap(host: HTMLElement) {
     let renderedBusPosition: [number, number] = [...busPosition];
     let markerAnimationFrame: number | null = null;
     const normalizeHeading = (value: number) => (value % 360 + 360) % 360;
+    const headingLabel = (value: number) => {
+      const directions = ["North", "Northeast", "East", "Southeast", "South", "Southwest", "West", "Northwest"];
+      return directions[Math.round(normalizeHeading(value) / 45) % directions.length];
+    };
     const focusBusOnMap = (target: [number, number], zoom: number, duration: number) => {
       if (!followBus || !mapLoaded) return;
       const options: { center: [number, number]; zoom: number; duration: number; easing?: (value: number) => number; bearing?: number } = {
@@ -708,7 +712,12 @@ async function mountLiveMap(host: HTMLElement) {
         const movementHeading = Number.isFinite(position.coords.heading) && position.coords.heading != null
           ? normalizeHeading(position.coords.heading)
           : lastPosition && moved > .004 ? bearing(lastPosition, rawCurrent) : null;
-        if (movementHeading != null) latestTravelHeading = movementHeading;
+        if (movementHeading != null) {
+          latestTravelHeading = movementHeading;
+          const heading = document.querySelector<HTMLElement>(".avl-heading");
+          if (heading) heading.textContent = `${headingLabel(movementHeading)} · ${Math.round(movementHeading)}°`;
+          gpsEvent({type:"heading", heading:Math.round(movementHeading), direction:headingLabel(movementHeading)});
+        }
         const markerDuration = lastMarkerFixAt ? Math.max(700, Math.min(1400, position.timestamp - lastMarkerFixAt + 200)) : 0;
         lastMarkerFixAt = position.timestamp;
         gpsTrace.push({coordinates:rawCurrent, accuracy:Math.min(50, Math.max(5, position.coords.accuracy)), timestamp:Math.floor(position.timestamp / 1000)});
