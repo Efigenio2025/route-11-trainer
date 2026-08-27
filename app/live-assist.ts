@@ -442,7 +442,7 @@ async function mountLiveMap(host: HTMLElement) {
   runtime.appendChild(gpsButton);
   const details = document.createElement("div");
   details.className = "avl-details";
-  details.innerHTML = `<span>GPS <b class="avl-accuracy">—</b></span><span>HEADING <b class="avl-heading">—</b></span><span>UPDATED <b class="avl-updated">—</b></span>`;
+  details.innerHTML = `<span>GPS <b class="avl-accuracy">—</b></span><span>HEADING / FACING <b class="avl-heading">—</b></span><span>UPDATED <b class="avl-updated">—</b></span>`;
   const centerButton = document.createElement("button");
   centerButton.type = "button";
   centerButton.className = "center-bus";
@@ -514,6 +514,9 @@ async function mountLiveMap(host: HTMLElement) {
     let trackUp = false;
     let perspective3d = true;
     let latestTravelHeading: number | null = null;
+    let compassHeading: number | null = null;
+    let compassListening = false;
+    let compassHandler: (event: Event) => void = () => {};
     let trackUpButton: HTMLButtonElement | null = null;
     let perspectiveButton: HTMLButtonElement | null = null;
     let renderedBusPosition: [number, number] = [...busPosition];
@@ -522,6 +525,11 @@ async function mountLiveMap(host: HTMLElement) {
     const headingLabel = (value: number) => {
       const directions = ["North", "Northeast", "East", "Southeast", "South", "Southwest", "West", "Northwest"];
       return directions[Math.round(normalizeHeading(value) / 45) % directions.length];
+    };
+    const updateHeadingReadout = (value: number) => {
+      const heading = document.querySelector<HTMLElement>(".avl-heading");
+      if (heading) heading.textContent = `${headingLabel(value)} · ${Math.round(value)}°`;
+      if (trackUp && followBus && mapLoaded) map.setBearing(value);
     };
     const focusBusOnMap = (target: [number, number], zoom: number, duration: number) => {
       if (!followBus || !mapLoaded) return;
@@ -599,6 +607,11 @@ async function mountLiveMap(host: HTMLElement) {
       if (window.__routeTrainerWatch != null) {
         navigator.geolocation?.clearWatch(window.__routeTrainerWatch);
         window.__routeTrainerWatch = undefined;
+      }
+      if (compassListening) {
+        window.removeEventListener("deviceorientationabsolute", compassHandler as EventListener);
+        window.removeEventListener("deviceorientation", compassHandler as EventListener);
+        compassListening = false;
       }
       window.__startRouteGPS = undefined;
       try { map.remove(); } catch { /* Map may already be unavailable. */ }
@@ -691,6 +704,27 @@ async function mountLiveMap(host: HTMLElement) {
     const startGps = async () => {
       if (!navigator.geolocation) { gpsButton.textContent = "GPS unavailable"; return; }
       gpsButton.textContent = "Locating…";
+      // iOS Safari requires this permission request to happen directly from
+      // the user's Live GPS tap before compass readings are delivered.
+      const orientationApi = (window.DeviceOrientationEvent as typeof DeviceOrientationEvent & { requestPermission?: () => Promise<string> } | undefined);
+      if (orientationApi && typeof orientationApi.requestPermission === "function") {
+        try { await orientationApi.requestPermission(); } catch { /* GPS still works if compass permission is declined. */ }
+      }
+      if (!compassListening) {
+        compassHandler = (event: Event) => {
+          const orientation = event as DeviceOrientationEvent & { webkitCompassHeading?: number; webkitCompassAccuracy?: number };
+          let heading: number | null = null;
+          if (Number.isFinite(orientation.webkitCompassHeading)) heading = Number(orientation.webkitCompassHeading);
+          else if (orientation.absolute && Number.isFinite(orientation.alpha)) heading = 360 - Number(orientation.alpha);
+          if (heading == null || !Number.isFinite(heading)) return;
+          compassHeading = normalizeHeading(heading);
+          latestTravelHeading = compassHeading;
+          updateHeadingReadout(compassHeading);
+        };
+        window.addEventListener("deviceorientationabsolute", compassHandler as EventListener, { passive: true });
+        window.addEventListener("deviceorientation", compassHandler as EventListener, { passive: true });
+        compassListening = true;
+      }
       let targetIndex = 0, promptStage = 0, completionFixes = 0, offRouteFixes = 0, onRouteFixes = 0, offRouteAnnounced = false;
       let initialized = false, headingLocked = false, lastPosition: [number, number] | null = null, lastRouteSegment = 1, lastAlong: number | null = null;
       let fixCount = 0, wrongWayFixes = 0, wrongWayAnnounced = false, weakGpsAnnounced = false;
@@ -711,12 +745,10 @@ async function mountLiveMap(host: HTMLElement) {
         const moving = (position.coords.speed ?? 0) > 1.5 || moved > .004;
         const movementHeading = Number.isFinite(position.coords.heading) && position.coords.heading != null
           ? normalizeHeading(position.coords.heading)
-          : lastPosition && moved > .004 ? bearing(lastPosition, rawCurrent) : null;
-        if (movementHeading != null) {
+          : lastPosition && moved > .004 ? bearing(lastPosition, rawCurrent) : compassHeading;
+        if (movementHeading != null && (position.coords.heading != null || lastPosition && moved > .004)) {
           latestTravelHeading = movementHeading;
-          const heading = document.querySelector<HTMLElement>(".avl-heading");
-          if (heading) heading.textContent = `${headingLabel(movementHeading)} · ${Math.round(movementHeading)}°`;
-          gpsEvent({type:"heading", heading:Math.round(movementHeading), direction:headingLabel(movementHeading)});
+          updateHeadingReadout(movementHeading);
         }
         const markerDuration = lastMarkerFixAt ? Math.max(700, Math.min(1400, position.timestamp - lastMarkerFixAt + 200)) : 0;
         lastMarkerFixAt = position.timestamp;
