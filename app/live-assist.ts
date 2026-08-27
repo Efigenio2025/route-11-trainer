@@ -948,7 +948,7 @@ async function mountLiveMap(host: HTMLElement) {
         }
         if (reliableGps && onRoute && maneuverDistance > .08 && nearestStop.distance <= 300 / 5280 && !announcedStops.has(nearestStop.i)) {
           announcedStops.add(nearestStop.i);
-          gpsEvent({type:"stop-ahead", stopName:nearestStop.stop.name, distanceFeet:Math.round(nearestStop.distance * 5280)});
+          gpsEvent({type:"stop-ahead", stopName:nearestStop.stop.name, stopNumber:nearestStop.i + 1, distanceFeet:Math.round(nearestStop.distance * 5280)});
         }
         const passedManeuver = promptStage < 4 && reliableGps && onRoute && !wrongWay && routeMatch.along >= checkpointProgress[targetIndex] + .012;
         completionFixes = passedManeuver ? completionFixes + 1 : 0;
