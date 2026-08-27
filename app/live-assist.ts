@@ -245,9 +245,8 @@ function routeShapingPoints(route: [number, number][], stopAnchors: [number, num
     }
   }
   points.push(route[route.length - 1]);
-  // Route 3 has a dense, official stop pattern. Keep those stop locations as
-  // shaping anchors so Mapbox cannot shortcut between long straight segments
-  // and the generated maneuvers stay tied to the actual bus alignment.
+  // Keep official stop locations as shaping anchors so Mapbox cannot shortcut
+  // between long segments and generated maneuvers stay tied to bus alignment.
   const anchors = stopAnchors
     .map(coordinates => ({coordinates, progress:projectOnRoute(coordinates, route, lengths).along}))
     .sort((a, b) => a.progress - b.progress)
@@ -267,7 +266,7 @@ function chunkShapingPoints(points: [number, number][]) {
 }
 
 function directionsCacheKey(routeNumber: string, direction: string) {
-  return `rt-mapbox-directions-v2:${routeNumber}:${direction}`;
+  return `rt-mapbox-directions-v3:${routeNumber}:${direction}`;
 }
 
 async function fetchMapboxGuidance(
@@ -283,7 +282,7 @@ async function fetchMapboxGuidance(
     if (cached?.savedAt > Date.now() - 7 * 86400000 && Array.isArray(cached?.plan?.steps)) return cached.plan;
   } catch { /* Ignore an unavailable or invalid browser cache. */ }
 
-  const chunks = chunkShapingPoints(routeShapingPoints(officialRoute, routeNumber === "3" ? stopAnchors : []));
+  const chunks = chunkShapingPoints(routeShapingPoints(officialRoute, stopAnchors));
   const allSteps: MapboxGuidanceStep[] = [];
   const geometry: [number, number][] = [];
   for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
@@ -579,7 +578,7 @@ async function mountLiveMap(host: HTMLElement) {
     map.getCanvas().addEventListener("webglcontextlost", event => { event.preventDefault(); mapLoaded = false; showFallback(); });
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false, visualizePitch: false }), "bottom-right");
     map.dragPan.enable(); map.scrollZoom.enable(); map.touchZoomRotate.enable(); map.doubleClickZoom.enable();
-    const guidancePromise = fetchMapboxGuidance(routeNumber, host.dataset.direction || "", mapCoordinates, cumulativeRouteLengths, routeNumber === "3" || routeNumber === "24" ? stops.map(stop => stop.coordinates) : [])
+    const guidancePromise = fetchMapboxGuidance(routeNumber, host.dataset.direction || "", mapCoordinates, cumulativeRouteLengths, stops.map(stop => stop.coordinates))
       .then(plan => {
         navigationPlan = plan;
         checkpoints = plan.steps.map(step => step.coordinates);
