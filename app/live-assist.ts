@@ -469,6 +469,34 @@ async function mountLiveMap(host: HTMLElement) {
   centerButton.textContent = "Center on bus";
   details.appendChild(centerButton);
   host.parentElement?.querySelector(".avl-runtime")?.appendChild(details);
+  const navBanner = document.createElement("div");
+  navBanner.className = "map-nav-banner";
+  navBanner.hidden = true;
+  navBanner.setAttribute("aria-live", "polite");
+  navBanner.innerHTML = `<div class="map-nav-current"><span class="map-nav-icon" data-role="current-icon">↑</span><div><small>CURRENT TURN</small><strong data-role="current-text">Continue on route</strong></div></div><div class="map-nav-next"><span class="map-nav-next-icon" data-role="next-icon">↱</span><strong data-role="next-text">Next maneuver</strong></div>`;
+  runtime.appendChild(navBanner);
+  const navCurrentIcon = navBanner.querySelector<HTMLElement>("[data-role=current-icon]");
+  const navCurrentText = navBanner.querySelector<HTMLElement>("[data-role=current-text]");
+  const navNextIcon = navBanner.querySelector<HTMLElement>("[data-role=next-icon]");
+  const navNextText = navBanner.querySelector<HTMLElement>("[data-role=next-text]");
+  const maneuverIcon = (step: MapboxGuidanceStep | undefined) => {
+    const modifier = String(step?.modifier || "straight").toLowerCase();
+    if (modifier.includes("left")) return "↰";
+    if (modifier.includes("right")) return "↱";
+    if (modifier.includes("uturn")) return "↶";
+    if (modifier.includes("merge")) return "⇢";
+    return "↑";
+  };
+  const updateNavBanner = (activeIndex: number, plan: MapboxGuidancePlan | null) => {
+    const current = plan?.steps[activeIndex];
+    if (!current) { navBanner.hidden = true; return; }
+    navBanner.hidden = false;
+    if (navCurrentIcon) navCurrentIcon.textContent = maneuverIcon(current);
+    if (navCurrentText) navCurrentText.textContent = current.instruction || "Continue on route";
+    const next = plan?.steps[activeIndex + 1];
+    if (navNextIcon) navNextIcon.textContent = maneuverIcon(next);
+    if (navNextText) navNextText.textContent = next?.instruction || "End of route";
+  };
   let busPosition: [number, number] = mapCoordinates[0];
   try {
     const mapboxgl = await loadMapbox();
@@ -510,6 +538,7 @@ async function mountLiveMap(host: HTMLElement) {
         navigationPlan = plan;
         checkpoints = plan.steps.map(step => step.coordinates);
         checkpointProgress = plan.steps.map(step => step.progress);
+        updateNavBanner(0, plan);
         gpsEvent({type:"navigation-ready", total:plan.steps.length, provider:"Mapbox"});
         return plan;
       })
@@ -946,6 +975,7 @@ async function mountLiveMap(host: HTMLElement) {
           }
           headingLocked = true;
         }
+        updateNavBanner(targetIndex, navigationPlan);
         const maneuverDistance = Math.max(0, checkpointProgress[Math.min(targetIndex, checkpointProgress.length - 1)] - routeMatch.along);
         const nearestStop = stops.map((stop, i) => ({i, stop, distance:miles(current, stop.coordinates)})).sort((a, b) => a.distance - b.distance)[0];
         const routeDistance = rawRouteMatch.distance;
@@ -992,6 +1022,7 @@ async function mountLiveMap(host: HTMLElement) {
           if (targetIndex < checkpoints.length - 1) { targetIndex += 1; promptStage = 0; completionFixes = 0; }
           else { promptStage = 4; completionFixes = 0; }
           const nextGuidance = navigationPlan?.steps[targetIndex];
+          updateNavBanner(targetIndex, navigationPlan);
           gpsEvent({type:"complete", index:completed, nextIndex:targetIndex, total:navigationPlan?.steps.length, finished:completed === checkpoints.length - 1, instruction:nextGuidance?.instruction, modifier:nextGuidance?.modifier, provider:navigationPlan?"Mapbox":"operator"});
         }
         const accuracy = document.querySelector<HTMLElement>(".avl-accuracy");
