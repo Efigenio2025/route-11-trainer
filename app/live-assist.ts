@@ -397,6 +397,7 @@ async function mountLiveMap(host: HTMLElement) {
   if (!runtime) return;
   host.dataset.enhanced = "true";
   const routeNumber = host.dataset.route || "11";
+  const routeLabel = host.dataset.label || routeNumber;
   const route30South = routeNumber === "30" && host.dataset.direction === "southbound";
   const route3South = routeNumber === "3" && host.dataset.direction === "southbound";
   const route5South = routeNumber === "5" && host.dataset.direction === "southbound";
@@ -437,11 +438,44 @@ async function mountLiveMap(host: HTMLElement) {
   const route95Am = routeNumber === "95" && host.dataset.direction === "am-express";
   const route95Stops = route95Am ? ROUTE95_SOUTH_STOPS : ROUTE95_NORTH_STOPS;
   const route95Shape = route95Am ? ROUTE95_SOUTH_SHAPE : ROUTE95_NORTH_SHAPE;
+  const route00South = routeNumber === "00" && host.dataset.direction === "southbound";
+  const route00Stops = route00South ? ROUTE00_SOUTH_STOPS : ROUTE00_NORTH_STOPS;
+  const route00Shape = route00South ? ROUTE00_SOUTH_SHAPE : ROUTE00_NORTH_SHAPE;
+  const route13South = routeNumber === "13" && host.dataset.direction === "southbound";
+  const route13Stops = route13South ? ROUTE13_SOUTH_STOPS : ROUTE13_NORTH_STOPS;
+  const route13Shape = route13South ? ROUTE13_SOUTH_SHAPE : ROUTE13_NORTH_SHAPE;
+  const route18South = routeNumber === "18" && host.dataset.direction === "southbound";
+  const route18Stops = route18South ? ROUTE18_SOUTH_STOPS : ROUTE18_NORTH_STOPS;
+  const route18Shape = route18South ? ROUTE18_SOUTH_SHAPE : ROUTE18_NORTH_SHAPE;
+  const routeGreenStops = ROUTE200_NORTH_STOPS;
+  const routeGreenShape = ROUTE200_NORTH_SHAPE;
+  const routeBlueStops = ROUTE41_NORTH_STOPS;
+  const routeBlueShape = ROUTE41_NORTH_SHAPE;
+  const routeYellowStops = ROUTE43_NORTH_STOPS;
+  const routeYellowShape = ROUTE43_NORTH_SHAPE;
+  const route92South = routeNumber === "92" && host.dataset.direction === "southbound";
+  const route92Stops = route92South ? ROUTE92_SOUTH_STOPS : ROUTE92_NORTH_STOPS;
+  const route92Shape = route92South ? ROUTE92_SOUTH_SHAPE : ROUTE92_NORTH_SHAPE;
+  const route93South = routeNumber === "93" && host.dataset.direction === "southbound";
+  const route93Stops = route93South ? ROUTE93_SOUTH_STOPS : ROUTE93_NORTH_STOPS;
+  const route93Shape = route93South ? ROUTE93_SOUTH_SHAPE : ROUTE93_NORTH_SHAPE;
+  const route94South = routeNumber === "94" && host.dataset.direction === "southbound";
+  const route94Stops = route94South ? ROUTE94_SOUTH_STOPS : ROUTE94_NORTH_STOPS;
+  const route94Shape = route94South ? ROUTE94_SOUTH_SHAPE : ROUTE94_NORTH_SHAPE;
+  const route97South = routeNumber === "97" && host.dataset.direction === "southbound";
+  const route97Stops = route97South ? ROUTE97_SOUTH_STOPS : ROUTE97_NORTH_STOPS;
+  const route97Shape = route97South ? ROUTE97_SOUTH_SHAPE : ROUTE97_NORTH_SHAPE;
+  const route106South = routeNumber === "106" && host.dataset.direction === "southbound";
+  const route106Stops = route106South ? ROUTE106_SOUTH_STOPS : ROUTE106_NORTH_STOPS;
+  const route106Shape = route106South ? ROUTE106_SOUTH_SHAPE : ROUTE106_NORTH_SHAPE;
+  const route120South = routeNumber === "120" && host.dataset.direction === "southbound";
+  const route120Stops = route120South ? ROUTE120_SOUTH_STOPS : ROUTE120_NORTH_STOPS;
+  const route120Shape = route120South ? ROUTE120_SOUTH_SHAPE : ROUTE120_NORTH_SHAPE;
   const maneuverCount = Number(host.dataset.maneuvers || 1);
   const route26Clockwise = routeNumber === "26" && host.dataset.direction === "clockwise";
   const route26Shape = route26Clockwise ? [...ROUTE26_LOOP_SHAPE].reverse() : ROUTE26_LOOP_SHAPE;
   const route26Stops = route26Clockwise ? [...ROUTE26_LOOP_STOPS].reverse() : ROUTE26_LOOP_STOPS;
-  const mapCoordinates = routeNumber === "3" ? route3Shape : routeNumber === "5" ? route5Shape : routeNumber === "8" ? route8Shape : routeNumber === "24" ? route24Shape : routeNumber === "30" ? route30Shape : routeNumber === "4" ? route4Shape : routeNumber === "14" ? route14Shape : routeNumber === "35" ? route35Shape : routeNumber === "36" ? route36Shape : routeNumber === "26" ? route26Shape : routeNumber === "15" ? route15Shape : routeNumber === "55" ? route55Shape : routeNumber === "95" ? route95Shape : route11Shape;
+  const mapCoordinates = routeNumber === "3" ? route3Shape : routeNumber === "5" ? route5Shape : routeNumber === "8" ? route8Shape : routeNumber === "24" ? route24Shape : routeNumber === "30" ? route30Shape : routeNumber === "4" ? route4Shape : routeNumber === "14" ? route14Shape : routeNumber === "35" ? route35Shape : routeNumber === "36" ? route36Shape : routeNumber === "26" ? route26Shape : routeNumber === "15" ? route15Shape : routeNumber === "55" ? route55Shape : routeNumber === "95" ? route95Shape : routeNumber === "00" ? route00Shape : routeNumber === "13" ? route13Shape : routeNumber === "18" ? route18Shape : routeNumber === "200" ? routeGreenShape : routeNumber === "41" ? routeBlueShape : routeNumber === "43" ? routeYellowShape : routeNumber === "92" ? route92Shape : routeNumber === "93" ? route93Shape : routeNumber === "94" ? route94Shape : routeNumber === "97" ? route97Shape : routeNumber === "106" ? route106Shape : routeNumber === "120" ? route120Shape : route11Shape;
   let checkpoints = routeNumber === "30"
     ? route30Turns.map(point => point.coordinates)
     : routeNumber === "95" ? (route95Am ? ROUTE95_AM_TURNS : ROUTE95_PM_TURNS)
@@ -459,11 +493,11 @@ async function mountLiveMap(host: HTMLElement) {
     ? route24Stops
     : routeNumber === "30"
     ? route30Stops
-    : routeNumber === "4" ? route4Stops : routeNumber === "14" ? route14Stops : routeNumber === "35" ? route35Stops : routeNumber === "36" ? route36Stops : routeNumber === "26" ? route26Stops : routeNumber === "15" ? route15Stops : routeNumber === "55" ? route55Stops : routeNumber === "95" ? route95Stops : route11Stops;
+    : routeNumber === "4" ? route4Stops : routeNumber === "14" ? route14Stops : routeNumber === "35" ? route35Stops : routeNumber === "36" ? route36Stops : routeNumber === "26" ? route26Stops : routeNumber === "15" ? route15Stops : routeNumber === "55" ? route55Stops : routeNumber === "95" ? route95Stops : routeNumber === "00" ? route00Stops : routeNumber === "13" ? route13Stops : routeNumber === "18" ? route18Stops : routeNumber === "200" ? routeGreenStops : routeNumber === "41" ? routeBlueStops : routeNumber === "43" ? routeYellowStops : routeNumber === "92" ? route92Stops : routeNumber === "93" ? route93Stops : routeNumber === "94" ? route94Stops : routeNumber === "97" ? route97Stops : routeNumber === "106" ? route106Stops : routeNumber === "120" ? route120Stops : route11Stops;
   const fallbackNavigationPlan = buildFallbackNavigationPlan(mapCoordinates, checkpoints, checkpointProgress, stops);
   const fallbackMap = document.createElement("img");
   fallbackMap.className = "map-fallback-basemap";
-  fallbackMap.alt = `Street map for Route ${routeNumber}`;
+  fallbackMap.alt = `Street map for Route ${routeLabel}`;
   fallbackMap.decoding = "async";
   const sampleEvery = Math.max(1, Math.ceil(mapCoordinates.length / 70));
   const sampledRoute = mapCoordinates.filter((_, index) => index % sampleEvery === 0);
@@ -480,7 +514,7 @@ async function mountLiveMap(host: HTMLElement) {
   runtime.appendChild(fallbackMap);
   const fallback = document.createElement("canvas");
   fallback.className = "route-canvas";
-  fallback.setAttribute("aria-label", `Route ${routeNumber} path`);
+  fallback.setAttribute("aria-label", `Route ${routeLabel} path`);
   runtime.appendChild(fallback);
   const drawFallback = () => {
     const ratio = Math.min(window.devicePixelRatio || 1, 2), rect = host.getBoundingClientRect();
@@ -595,7 +629,7 @@ async function mountLiveMap(host: HTMLElement) {
     const busMarkerElement = document.createElement("div");
     busMarkerElement.className = "live-bus-marker";
     busMarkerElement.setAttribute("role", "img");
-    busMarkerElement.setAttribute("aria-label", `Route ${routeNumber} bus location`);
+    busMarkerElement.setAttribute("aria-label", `Route ${routeLabel} bus location`);
     const busMarkerImage = document.createElement("img");
     busMarkerImage.src = "/metro-bus-marker-rear.png";
     busMarkerImage.alt = "";
@@ -603,7 +637,7 @@ async function mountLiveMap(host: HTMLElement) {
     busMarkerElement.appendChild(busMarkerImage);
     const busMarker = new mapboxgl.Marker({ element: busMarkerElement, anchor: "center" })
       .setLngLat(busPosition)
-      .setPopup(new mapboxgl.Popup({ offset: 24 }).setText(`Route ${routeNumber} bus location`))
+      .setPopup(new mapboxgl.Popup({ offset: 24 }).setText(`Route ${routeLabel} bus location`))
       .addTo(map);
     let followBus = true;
     let trackUp = false;
@@ -1180,4 +1214,70 @@ import {
   ROUTE95_SOUTH_SHAPE,
   ROUTE95_SOUTH_STOPS,
 } from "./route95-official";
+import {
+  ROUTE00_NORTH_SHAPE,
+  ROUTE00_NORTH_STOPS,
+  ROUTE00_SOUTH_SHAPE,
+  ROUTE00_SOUTH_STOPS,
+} from "./route00-official";
+import {
+  ROUTE13_NORTH_SHAPE,
+  ROUTE13_NORTH_STOPS,
+  ROUTE13_SOUTH_SHAPE,
+  ROUTE13_SOUTH_STOPS,
+} from "./route13-official";
+import {
+  ROUTE18_NORTH_SHAPE,
+  ROUTE18_NORTH_STOPS,
+  ROUTE18_SOUTH_SHAPE,
+  ROUTE18_SOUTH_STOPS,
+} from "./route18-official";
+import {
+  ROUTE200_NORTH_SHAPE,
+  ROUTE200_NORTH_STOPS,
+} from "./route200-official";
+import {
+  ROUTE41_NORTH_SHAPE,
+  ROUTE41_NORTH_STOPS,
+} from "./route41-official";
+import {
+  ROUTE43_NORTH_SHAPE,
+  ROUTE43_NORTH_STOPS,
+} from "./route43-official";
+import {
+  ROUTE92_NORTH_SHAPE,
+  ROUTE92_NORTH_STOPS,
+  ROUTE92_SOUTH_SHAPE,
+  ROUTE92_SOUTH_STOPS,
+} from "./route92-official";
+import {
+  ROUTE93_NORTH_SHAPE,
+  ROUTE93_NORTH_STOPS,
+  ROUTE93_SOUTH_SHAPE,
+  ROUTE93_SOUTH_STOPS,
+} from "./route93-official";
+import {
+  ROUTE94_NORTH_SHAPE,
+  ROUTE94_NORTH_STOPS,
+  ROUTE94_SOUTH_SHAPE,
+  ROUTE94_SOUTH_STOPS,
+} from "./route94-official";
+import {
+  ROUTE97_NORTH_SHAPE,
+  ROUTE97_NORTH_STOPS,
+  ROUTE97_SOUTH_SHAPE,
+  ROUTE97_SOUTH_STOPS,
+} from "./route97-official";
+import {
+  ROUTE106_NORTH_SHAPE,
+  ROUTE106_NORTH_STOPS,
+  ROUTE106_SOUTH_SHAPE,
+  ROUTE106_SOUTH_STOPS,
+} from "./route106-official";
+import {
+  ROUTE120_NORTH_SHAPE,
+  ROUTE120_NORTH_STOPS,
+  ROUTE120_SOUTH_SHAPE,
+  ROUTE120_SOUTH_STOPS,
+} from "./route120-official";
 
