@@ -7,6 +7,8 @@ import "./avl.css";
 import "./live-assist";
 import {ROUTE3_NORTH_STOPS,ROUTE3_SOUTH_STOPS} from "./route3-official";
 import {ROUTE5_NORTH_STOPS,ROUTE5_SOUTH_STOPS} from "./route5-official";
+import {ROUTE8_NORTH_STOPS,ROUTE8_SOUTH_STOPS} from "./route8-official";
+import {ROUTE24_NORTH_STOPS,ROUTE24_SOUTH_STOPS} from "./route24-official";
 
 type Turn="left"|"right"|"continue";
 type Step={action:Turn;street:string;until:string;note?:string};
@@ -31,6 +33,10 @@ const route3NorthSteps=officialRoute3Steps(ROUTE3_NORTH_STOPS);
 const route3SouthSteps=officialRoute3Steps(ROUTE3_SOUTH_STOPS);
 const route5NorthSteps=officialRoute3Steps(ROUTE5_NORTH_STOPS);
 const route5SouthSteps=officialRoute3Steps(ROUTE5_SOUTH_STOPS);
+const route8NorthSteps=officialRoute3Steps(ROUTE8_NORTH_STOPS);
+const route8SouthSteps=officialRoute3Steps(ROUTE8_SOUTH_STOPS);
+const route24NorthSteps=officialRoute3Steps(ROUTE24_NORTH_STOPS);
+const route24SouthSteps=officialRoute3Steps(ROUTE24_SOUTH_STOPS);
 const routes:Route[]=[
  {id:"3",number:"3",name:"North 40th / South 42nd",subtitle:"22nd & Cuming ↔ North Omaha / MCC South",directions:[
   {id:"northbound",label:"Northbound",origin:"22nd & Cuming",destination:"North Omaha T.C.",steps:route3NorthSteps},
@@ -45,6 +51,10 @@ const routes:Route[]=[
  {id:"5",number:"5",name:"90th Street",subtitle:"North Omaha Transit Center ↔ Westroads Transit Center",directions:[
   {id:"northbound",label:"Northbound",origin:"North Omaha T.C.",destination:"Westroads T.C.",steps:route5NorthSteps},
   {id:"southbound",label:"Southbound",origin:"Westroads T.C.",destination:"North Omaha T.C.",steps:route5SouthSteps}
+ ]},
+ {id:"8",number:"8",name:"60th / Blondo Street",subtitle:"North Omaha Transit Center ↔ Benson / Crossroads",directions:[
+  {id:"northbound",label:"Northbound",origin:"North Omaha T.C.",destination:"Benson / Crossroads",steps:route8NorthSteps},
+  {id:"southbound",label:"Southbound",origin:"Benson / Crossroads",destination:"North Omaha T.C.",steps:route8SouthSteps}
  ]},
  {id:"30",number:"30",name:"Aksarben / North Omaha",subtitle:"Aksarben T.C. ↔ 31st & Ferry",directions:[
   {id:"northbound",label:"Northbound",origin:"Aksarben T.C.",destination:"31st & Ferry layover",steps:[
@@ -130,6 +140,10 @@ const routes:Route[]=[
    {action:"continue",street:"Dodge Street",until:"16th Street"},{action:"left",street:"16th Street",until:"Farnam Street"},{action:"right",street:"Farnam Street",until:"42nd Street"},{action:"left",street:"42nd Street",until:"Center Street"},{action:"right",street:"Center Street",until:"67th Street"},{action:"right",street:"67th Street",until:"Mercy Road"},{action:"left",street:"Mercy Road",until:"layover"},{action:"continue",street:"Mercy Road",until:"78th Street"},{action:"left",street:"78th Street",until:"West Center Road"},{action:"right",street:"West Center Road",until:"Oakview Drive"},{action:"left",street:"Oakview Mall Drive",until:"143rd Place stop sign"},{action:"right",street:"143rd Street",until:"second mall entrance"},{action:"left",street:"second mall entrance",until:"Oak View layover",note:"Use Route 55 turn-by-turn when interlining with Route 55."}]},
   {id:"eastbound",label:"Eastbound",origin:"Oak View Mall",destination:"22nd & Cuming",steps:[
    {action:"continue",street:"Mall Drive",until:"stop sign"},{action:"left",street:"South 143rd Street",until:"Oakview Drive"},{action:"right",street:"Oakview Drive",until:"South 144th Street"},{action:"right",street:"South 144th Street",until:"Center Street"},{action:"right",street:"West Center Road",until:"78th Street"},{action:"left",street:"78th Street",until:"Mercy Road"},{action:"right",street:"Mercy Road",until:"Aksarben Transit Center"},{action:"continue",street:"Mercy Road",until:"67th Street"},{action:"right",street:"67th Street",until:"Center Street"},{action:"left",street:"Center Street",until:"42nd Street"},{action:"left",street:"42nd Street",until:"Farnam Street"},{action:"right",street:"Farnam Street",until:"Turner Boulevard"},{action:"right",street:"Turner Boulevard",until:"Harney Street"},{action:"left",street:"Harney Street",until:"13th Street"},{action:"left",street:"13th Street",until:"Dodge Street"},{action:"left",street:"Dodge Street",until:"layover"}]}
+ ]},
+ {id:"24",number:"24",name:"24th Street",subtitle:"North Omaha Transit Center ↔ MCC South Transit Center",directions:[
+  {id:"northbound",label:"Northbound",origin:"MCC South Transit Center",destination:"North Omaha Transit Center",steps:route24NorthSteps},
+  {id:"southbound",label:"Southbound",origin:"North Omaha Transit Center",destination:"MCC South Transit Center",steps:route24SouthSteps}
  ]},
  {id:"55",number:"55",name:"Q Street",subtitle:"22nd & Cuming ↔ 118th & Q",directions:[
   {id:"westbound",label:"Westbound",origin:"22nd & Cuming",destination:"118th & Q",steps:[
