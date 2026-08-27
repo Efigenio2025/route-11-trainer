@@ -748,10 +748,7 @@ async function mountLiveMap(host: HTMLElement) {
       if (markerHasLiveFix && !options.moving && distanceToTarget < jitterThreshold) return;
       if (markerAnimationFrame != null) cancelAnimationFrame(markerAnimationFrame);
       const source: [number, number] = [...renderedBusPosition];
-      // Keep the visual interpolation short enough that a moving bus does
-      // not trail the latest GPS fix by a block. Longer easing windows look
-      // smooth but can leave the marker 40–60 ft behind at city speeds.
-      const duration = distanceToTarget > .5 || !markerHasLiveFix ? 0 : Math.max(240, Math.min(560, options.duration ?? 420));
+      const duration = distanceToTarget > .5 || !markerHasLiveFix ? 0 : Math.max(650, Math.min(1500, options.duration ?? 1050));
       markerHasLiveFix = true;
       if (duration === 0) {
         renderedBusPosition = [...target];
