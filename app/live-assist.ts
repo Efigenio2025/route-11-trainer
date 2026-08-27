@@ -353,6 +353,43 @@ async function fetchMapboxGuidance(
   return plan;
 }
 
+// Keep the map navigation banner useful even when the Directions API is
+// unavailable (for example, while a phone is offline or a route has a
+// temporary detour). The official transit shape and stop sequence still give
+// us a dependable visual current/next cue until Mapbox guidance is ready.
+function buildFallbackNavigationPlan(
+  route: [number, number][],
+  checkpoints: [number, number][],
+  checkpointProgress: number[],
+  stops: MapPoint[],
+): MapboxGuidancePlan {
+  const steps = checkpoints.map((coordinates, index) => {
+    const previous = checkpoints[Math.max(0, index - 1)] ?? coordinates;
+    const next = checkpoints[index + 1] ?? coordinates;
+    const incoming = index === 0 ? bearing(route[0], coordinates) : bearing(previous, coordinates);
+    const outgoing = index === checkpoints.length - 1 ? incoming : bearing(coordinates, next);
+    const delta = ((outgoing - incoming + 540) % 360) - 180;
+    const modifier = delta > 35 ? "right" : delta < -35 ? "left" : "straight";
+    const nearest = stops.reduce<{stop: MapPoint | null; distance: number}>((best, stop) => {
+      const distance = miles(coordinates, stop.coordinates);
+      return distance < best.distance ? {stop, distance} : best;
+    }, {stop: null, distance: Infinity}).stop;
+    const destination = nearest?.name || "the next stop";
+    const instruction = index === 0
+      ? `Continue toward ${destination}`
+      : modifier === "straight" ? `Continue toward ${destination}` : `Turn ${modifier} toward ${destination}`;
+    return {
+      coordinates,
+      instruction,
+      modifier,
+      type: modifier === "straight" ? "continue" : "turn",
+      progress: checkpointProgress[index] ?? 0,
+      voiceInstructions: [],
+    };
+  });
+  return {steps, geometry: route};
+}
+
 const liveMapCleanups = new Map<HTMLElement, () => void>();
 
 async function mountLiveMap(host: HTMLElement) {
@@ -424,6 +461,7 @@ async function mountLiveMap(host: HTMLElement) {
     : routeNumber === "30"
     ? route30Stops
     : routeNumber === "4" ? route4Stops : routeNumber === "14" ? route14Stops : routeNumber === "35" ? route35Stops : routeNumber === "36" ? route36Stops : routeNumber === "26" ? route26Stops : routeNumber === "15" ? route15Stops : routeNumber === "55" ? route55Stops : routeNumber === "95" ? route95Stops : route11Stops;
+  const fallbackNavigationPlan = buildFallbackNavigationPlan(mapCoordinates, checkpoints, checkpointProgress, stops);
   const fallbackMap = document.createElement("img");
   fallbackMap.className = "map-fallback-basemap";
   fallbackMap.alt = `Street map for Route ${routeNumber}`;
@@ -502,6 +540,9 @@ async function mountLiveMap(host: HTMLElement) {
     if (navNextIcon) navNextIcon.textContent = maneuverIcon(next);
     if (navNextText) navNextText.textContent = next?.instruction || "End of route";
   };
+  // Show a route-aware banner immediately; Mapbox replaces it automatically
+  // when its full turn-by-turn plan finishes loading.
+  updateNavBanner(0, fallbackNavigationPlan);
   let busPosition: [number, number] = mapCoordinates[0];
   try {
     const mapboxgl = await loadMapbox();
@@ -538,7 +579,7 @@ async function mountLiveMap(host: HTMLElement) {
     map.getCanvas().addEventListener("webglcontextlost", event => { event.preventDefault(); mapLoaded = false; showFallback(); });
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false, visualizePitch: false }), "bottom-right");
     map.dragPan.enable(); map.scrollZoom.enable(); map.touchZoomRotate.enable(); map.doubleClickZoom.enable();
-    const guidancePromise = fetchMapboxGuidance(routeNumber, host.dataset.direction || "", mapCoordinates, cumulativeRouteLengths, routeNumber === "3" ? route3Stops.map(stop => stop.coordinates) : [])
+    const guidancePromise = fetchMapboxGuidance(routeNumber, host.dataset.direction || "", mapCoordinates, cumulativeRouteLengths, routeNumber === "3" || routeNumber === "24" ? stops.map(stop => stop.coordinates) : [])
       .then(plan => {
         navigationPlan = plan;
         checkpoints = plan.steps.map(step => step.coordinates);
@@ -548,6 +589,7 @@ async function mountLiveMap(host: HTMLElement) {
         return plan;
       })
       .catch(() => {
+        updateNavBanner(0, fallbackNavigationPlan);
         gpsEvent({type:"navigation-fallback", total:checkpoints.length});
         return null;
       });
@@ -980,7 +1022,7 @@ async function mountLiveMap(host: HTMLElement) {
           }
           headingLocked = true;
         }
-        updateNavBanner(targetIndex, navigationPlan);
+        updateNavBanner(targetIndex, navigationPlan || fallbackNavigationPlan);
         const maneuverDistance = Math.max(0, checkpointProgress[Math.min(targetIndex, checkpointProgress.length - 1)] - routeMatch.along);
         const nearestStop = stops.map((stop, i) => ({i, stop, distance:miles(current, stop.coordinates)})).sort((a, b) => a.distance - b.distance)[0];
         const routeDistance = rawRouteMatch.distance;
@@ -1027,7 +1069,7 @@ async function mountLiveMap(host: HTMLElement) {
           if (targetIndex < checkpoints.length - 1) { targetIndex += 1; promptStage = 0; completionFixes = 0; }
           else { promptStage = 4; completionFixes = 0; }
           const nextGuidance = navigationPlan?.steps[targetIndex];
-          updateNavBanner(targetIndex, navigationPlan);
+          updateNavBanner(targetIndex, navigationPlan || fallbackNavigationPlan);
           gpsEvent({type:"complete", index:completed, nextIndex:targetIndex, total:navigationPlan?.steps.length, finished:completed === checkpoints.length - 1, instruction:nextGuidance?.instruction, modifier:nextGuidance?.modifier, provider:navigationPlan?"Mapbox":"operator"});
         }
         const accuracy = document.querySelector<HTMLElement>(".avl-accuracy");
