@@ -556,7 +556,7 @@ async function mountLiveMap(host: HTMLElement) {
       style: "mapbox://styles/mapbox/standard",
       config: { basemap: { lightPreset: "day", show3dObjects: true } },
       center: [-95.974, 41.251],
-      zoom: 12.1,
+      zoom: 13.0,
       pitch: 60,
       bearing: 0,
       attributionControl: true,
@@ -894,7 +894,7 @@ async function mountLiveMap(host: HTMLElement) {
       host.dataset.mapReady = "true";
       host.dataset.mapFallback = "false";
       const bounds = mapCoordinates.reduce((b: any, p) => b.extend(p), new mapboxgl.LngLatBounds(mapCoordinates[0], mapCoordinates[0]));
-      map.fitBounds(bounds, { padding: 30, duration: 0 });
+      map.fitBounds(bounds, { padding: 12, duration: 0 });
       requestAnimationFrame(() => map.resize());
     });
     const startGps = async () => {
