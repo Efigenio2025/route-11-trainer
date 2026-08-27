@@ -13,21 +13,21 @@ type Route={id:string;number:string;name:string;subtitle:string;directions:Dir[]
 type LiveNavigation={instruction:string;modifier:string;index:number;total:number;provider:"Mapbox"|"operator"};
 const routes:Route[]=[
  {id:"3",number:"3",name:"North 40th / South 42nd",subtitle:"22nd & Cuming ↔ North Omaha / MCC South",directions:[
-  {id:"northbound",label:"Northbound",origin:"22nd & Cuming",destination:"North Omaha T.C.",steps:[
-   {action:"continue",street:"Cuming Street",until:"MCC South Transit Center"},
-   {action:"right",street:"Babe Gomez Avenue",until:"L Street",note:"Exit the transit center and turn onto Babe Gomez Avenue."},
+  {id:"northbound",label:"Northbound",origin:"Metro South T.C.",destination:"North Omaha T.C.",steps:[
+   {action:"continue",street:"Metro South Transit Center exit",until:"Babe Gomez Avenue"},
+   {action:"left",street:"Babe Gomez Avenue",until:"33rd Street"},
+   {action:"right",street:"33rd Street",until:"L Street"},
    {action:"left",street:"L Street",until:"42nd Street"},
-   {action:"left",street:"42nd Street",until:"Leavenworth Street"},
-   {action:"right",street:"Leavenworth Street",until:"Saddle Creek Road"},
-   {action:"right",street:"Saddle Creek Road",until:"Farnam Street"},
-   {action:"right",street:"Farnam Street",until:"North 40th Street"},
+   {action:"right",street:"42nd Street",until:"Harney Street"},
+   {action:"right",street:"Harney Street",until:"North 40th Street"},
    {action:"left",street:"North 40th Street",until:"Hamilton Street"},
    {action:"left",street:"Hamilton Street",until:"Military Avenue"},
-   {action:"right",street:"Military Avenue",until:"45th Street"},
-   {action:"right",street:"45th Street",until:"Bedford Avenue"},
-   {action:"left",street:"Bedford Avenue",until:"42nd Street"},
-   {action:"right",street:"42nd Street",until:"Ames Avenue"},
-   {action:"left",street:"Ames Avenue",until:"North Omaha Transit Center"}
+   {action:"right",street:"45th Street",until:"Bedford Avenue",note:"Merge right onto 45th Street."},
+   {action:"right",street:"Bedford Avenue",until:"42nd Street"},
+   {action:"left",street:"42nd Street",until:"Ames Avenue"},
+   {action:"right",street:"Ames Avenue",until:"30th Street"},
+   {action:"right",street:"30th Street",until:"North Omaha Transit Center"},
+   {action:"right",street:"North Omaha Transit Center entrance",until:"layover"}
   ]},
   {id:"southbound",label:"Southbound",origin:"North Omaha T.C.",destination:"MCC South T.C.",steps:[
    {action:"continue",street:"North Omaha Transit Center exit",until:"Ames Avenue"},
