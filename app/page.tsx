@@ -9,13 +9,23 @@ import {ROUTE3_NORTH_STOPS,ROUTE3_SOUTH_STOPS} from "./route3-official";
 import {ROUTE5_NORTH_STOPS,ROUTE5_SOUTH_STOPS} from "./route5-official";
 import {ROUTE8_NORTH_STOPS,ROUTE8_SOUTH_STOPS} from "./route8-official";
 import {ROUTE24_NORTH_STOPS,ROUTE24_SOUTH_STOPS} from "./route24-official";
+import {ROUTE11_EAST_STOPS,ROUTE11_WEST_STOPS} from "./route11-official";
+import {ROUTE30_NORTH_STOPS,ROUTE30_SOUTH_STOPS} from "./route30-official";
+import {ROUTE4_EAST_STOPS,ROUTE4_WEST_STOPS} from "./route4-official";
+import {ROUTE14_EAST_STOPS,ROUTE14_WEST_STOPS} from "./route14-official";
+import {ROUTE35_NORTH_STOPS,ROUTE35_SOUTH_STOPS} from "./route35-official";
+import {ROUTE36_NORTH_STOPS,ROUTE36_SOUTH_STOPS} from "./route36-official";
+import {ROUTE26_LOOP_STOPS} from "./route26-official";
+import {ROUTE15_EAST_STOPS,ROUTE15_WEST_STOPS} from "./route15-official";
+import {ROUTE55_EAST_STOPS,ROUTE55_WEST_STOPS} from "./route55-official";
+import {ROUTE95_NORTH_STOPS,ROUTE95_SOUTH_STOPS} from "./route95-official";
 
 type Turn="left"|"right"|"continue";
 type Step={action:Turn;street:string;until:string;note?:string};
 type Dir={id:string;label:string;origin:string;destination:string;steps:Step[]};
 type Route={id:string;number:string;name:string;subtitle:string;directions:Dir[]};
 type LiveNavigation={instruction:string;modifier:string;index:number;total:number;provider:"Mapbox"|"operator"};
-// Route 3 training steps are derived from the official Metro stop sequence.
+// Training steps are derived from the official Metro stop sequence.
 // The bearing change between consecutive official stops supplies a simple,
 // data-driven straight/left/right label for each stop-to-stop segment. Live
 // Assist uses the same official shape and asks Mapbox for full maneuvers.
@@ -24,29 +34,47 @@ const stopBearing=(a:[number,number],b:[number,number])=>{
  return (Math.atan2(y,x)/rad+360)%360;
 };
 const turnAction=(delta:number):Turn=>delta>35&&delta<145?"right":delta<-35&&delta>-145?"left":"continue";
-const officialRoute3Steps=(stops:{name:string;coordinates:[number,number]}[]):Step[]=>stops.slice(0,-1).map((stop,index)=>{
+const officialStopToStopSteps=(stops:{name:string;coordinates:[number,number]}[]):Step[]=>stops.slice(0,-1).map((stop,index)=>{
  const next=stops[index+1], before=stops[Math.max(0,index-1)];
  const action=index===0?"continue":turnAction(((stopBearing(stop.coordinates,next.coordinates)-stopBearing(before.coordinates,stop.coordinates)+540)%360)-180);
  return {action,street:stop.name,until:next.name};
 });
-const route3NorthSteps=officialRoute3Steps(ROUTE3_NORTH_STOPS);
-const route3SouthSteps=officialRoute3Steps(ROUTE3_SOUTH_STOPS);
-const route5NorthSteps=officialRoute3Steps(ROUTE5_NORTH_STOPS);
-const route5SouthSteps=officialRoute3Steps(ROUTE5_SOUTH_STOPS);
-const route8NorthSteps=officialRoute3Steps(ROUTE8_NORTH_STOPS);
-const route8SouthSteps=officialRoute3Steps(ROUTE8_SOUTH_STOPS);
-const route24NorthSteps=officialRoute3Steps(ROUTE24_NORTH_STOPS);
-const route24SouthSteps=officialRoute3Steps(ROUTE24_SOUTH_STOPS);
+const route3NorthSteps=officialStopToStopSteps(ROUTE3_NORTH_STOPS);
+const route3SouthSteps=officialStopToStopSteps(ROUTE3_SOUTH_STOPS);
+const route5NorthSteps=officialStopToStopSteps(ROUTE5_NORTH_STOPS);
+const route5SouthSteps=officialStopToStopSteps(ROUTE5_SOUTH_STOPS);
+const route8NorthSteps=officialStopToStopSteps(ROUTE8_NORTH_STOPS);
+const route8SouthSteps=officialStopToStopSteps(ROUTE8_SOUTH_STOPS);
+const route24NorthSteps=officialStopToStopSteps(ROUTE24_NORTH_STOPS);
+const route24SouthSteps=officialStopToStopSteps(ROUTE24_SOUTH_STOPS);
+const route11WestSteps=officialStopToStopSteps(ROUTE11_WEST_STOPS);
+const route11EastSteps=officialStopToStopSteps(ROUTE11_EAST_STOPS);
+const route30NorthSteps=officialStopToStopSteps(ROUTE30_NORTH_STOPS);
+const route30SouthSteps=officialStopToStopSteps(ROUTE30_SOUTH_STOPS);
+const route4WestSteps=officialStopToStopSteps(ROUTE4_WEST_STOPS);
+const route4EastSteps=officialStopToStopSteps(ROUTE4_EAST_STOPS);
+const route14WestSteps=officialStopToStopSteps(ROUTE14_WEST_STOPS);
+const route14EastSteps=officialStopToStopSteps(ROUTE14_EAST_STOPS);
+const route35NorthSteps=officialStopToStopSteps(ROUTE35_NORTH_STOPS);
+const route35SouthSteps=officialStopToStopSteps(ROUTE35_SOUTH_STOPS);
+const route36NorthSteps=officialStopToStopSteps(ROUTE36_NORTH_STOPS);
+const route36SouthSteps=officialStopToStopSteps(ROUTE36_SOUTH_STOPS);
+const route26CounterclockwiseSteps=officialStopToStopSteps(ROUTE26_LOOP_STOPS);
+const route26ClockwiseSteps=officialStopToStopSteps([...ROUTE26_LOOP_STOPS].reverse());
+const route15WestSteps=officialStopToStopSteps(ROUTE15_WEST_STOPS);
+const route15EastSteps=officialStopToStopSteps(ROUTE15_EAST_STOPS);
+const route55WestSteps=officialStopToStopSteps(ROUTE55_WEST_STOPS);
+const route55EastSteps=officialStopToStopSteps(ROUTE55_EAST_STOPS);
+const route95PmSteps=officialStopToStopSteps(ROUTE95_NORTH_STOPS);
+const route95AmSteps=officialStopToStopSteps(ROUTE95_SOUTH_STOPS);
 const routes:Route[]=[
  {id:"3",number:"3",name:"North 40th / South 42nd",subtitle:"22nd & Cuming ↔ North Omaha / MCC South",directions:[
   {id:"northbound",label:"Northbound",origin:"22nd & Cuming",destination:"North Omaha T.C.",steps:route3NorthSteps},
   {id:"southbound",label:"Southbound",origin:"North Omaha T.C.",destination:"22nd & Cuming",steps:route3SouthSteps}
  ]},
  {id:"11",number:"11",name:"Leavenworth / Aksarben",subtitle:"11th Street ↔ Aksarben Transit Center",directions:[
-  {id:"westbound",label:"Westbound",origin:"11th Street",destination:"Aksarben T.C.",steps:[
-   {action:"left",street:"Dodge",until:"16th Street"},{action:"left",street:"16th Street",until:"Howard"},{action:"right",street:"Howard",until:"St. Mary's",note:"Veer left onto St. Mary's, then continue to Leavenworth"},{action:"right",street:"Leavenworth",until:"60th Street"},{action:"left",street:"60th Street",until:"Pacific"},{action:"right",street:"Pacific",until:"67th Street"},{action:"left",street:"67th Street",until:"Pine"},{action:"right",street:"Pine",until:"Aksarben Drive"},{action:"left",street:"Aksarben Drive",until:"Mercy Road"},{action:"right",street:"Mercy Road",until:"Aksarben T.C."}]},
-  {id:"eastbound",label:"Eastbound",origin:"Aksarben T.C.",destination:"11th Street layover",steps:[
-   {action:"continue",street:"Mercy Road",until:"72nd Street"},{action:"right",street:"72nd Street",until:"Pine"},{action:"right",street:"Pine",until:"67th Street"},{action:"left",street:"67th Street",until:"Pacific"},{action:"right",street:"Pacific",until:"60th Street"},{action:"left",street:"60th Street",until:"Leavenworth"},{action:"right",street:"Leavenworth",until:"16th Street"},{action:"left",street:"16th Street",until:"Douglas"},{action:"right",street:"Douglas",until:"11th Street"},{action:"left",street:"11th Street",until:"Layover"}]}
+  {id:"westbound",label:"Westbound",origin:"11th Street",destination:"Aksarben T.C.",steps:route11WestSteps},
+  {id:"eastbound",label:"Eastbound",origin:"Aksarben T.C.",destination:"11th Street layover",steps:route11EastSteps}
  ]},
  {id:"5",number:"5",name:"90th Street",subtitle:"North Omaha Transit Center ↔ Westroads Transit Center",directions:[
   {id:"northbound",label:"Northbound",origin:"North Omaha T.C.",destination:"Westroads T.C.",steps:route5NorthSteps},
@@ -57,155 +85,44 @@ const routes:Route[]=[
   {id:"southbound",label:"Southbound",origin:"Benson / Crossroads",destination:"North Omaha T.C.",steps:route8SouthSteps}
  ]},
  {id:"30",number:"30",name:"Aksarben / North Omaha",subtitle:"Aksarben T.C. ↔ 31st & Ferry",directions:[
-  {id:"northbound",label:"Northbound",origin:"Aksarben T.C.",destination:"31st & Ferry layover",steps:[
-   {action:"continue",street:"Mercy Road",until:"67th Street"},{action:"right",street:"67th Street",until:"Center Street"},{action:"left",street:"Center Street",until:"51st / Saddle Creek"},{action:"left",street:"51st / Saddle Creek",until:"Farnam Street"},{action:"right",street:"Farnam Street",until:"42nd Street"},{action:"left",street:"42nd Street",until:"Dodge Street"},{action:"right",street:"Dodge / Douglas",until:"Park Avenue"},{action:"left",street:"Park Avenue",until:"Dodge Street"},{action:"left",street:"Dodge Street",until:"30th Street"},{action:"right",street:"30th Street",until:"North Omaha T.C."},{action:"left",street:"North Omaha T.C.",until:"Mid-route layover"},{action:"continue",street:"North Omaha T.C. exit",until:"31st Avenue"},{action:"right",street:"31st Avenue",until:"Ames Avenue"},{action:"right",street:"Ames Avenue",until:"30th Street"},{action:"left",street:"30th Street",until:"Ferry Street"},{action:"right",street:"Ferry Street",until:"Turn-around layover"}]},
-  {id:"southbound",label:"Southbound",origin:"31st & Ferry",destination:"Aksarben T.C.",steps:[
-   {action:"continue",street:"Turn-around exit",until:"Ferry Street"},{action:"left",street:"Ferry Street",until:"31st Street"},{action:"left",street:"31st / 30th Street",until:"Ames Avenue"},{action:"right",street:"Ames Avenue",until:"31st Avenue"},{action:"left",street:"31st Avenue",until:"North Omaha T.C."},{action:"left",street:"North Omaha T.C.",until:"Mid-route layover"},{action:"continue",street:"North Omaha T.C. exit",until:"30th Street"},{action:"right",street:"30th / Turner Boulevard",until:"Dodge Street"},{action:"right",street:"Dodge Street",until:"42nd Street access road"},{action:"right",street:"42nd Street jug-handle",until:"42nd Street"},{action:"left",street:"42nd Street",until:"Farnam Street"},{action:"right",street:"Farnam Street",until:"Saddle Creek Road"},{action:"left",street:"Saddle Creek Road",until:"Center Street"},{action:"right",street:"Center Street",until:"72nd Street northbound access"},{action:"left",street:"72nd Street access road",until:"Mercy Road"},{action:"right",street:"Mercy Road",until:"Aksarben T.C. layover"}]}
+  {id:"northbound",label:"Northbound",origin:"Aksarben T.C.",destination:"31st & Ferry layover",steps:route30NorthSteps},
+  {id:"southbound",label:"Southbound",origin:"31st & Ferry",destination:"Aksarben T.C.",steps:route30SouthSteps}
  ]},
  {id:"4",number:"4",name:"Maple Street",subtitle:"14th & Farnam ↔ Westroads Transit Center",directions:[
-  {id:"westbound",label:"Westbound",origin:"14th & Farnam",destination:"Westroads T.C.",steps:[
-   {action:"continue",street:"14th & Farnam",until:"Dodge Street"},
-   {action:"right",street:"Dodge Street",until:"15th Street"},
-   {action:"right",street:"15th Street",until:"Capitol Avenue"},
-   {action:"left",street:"Capitol Avenue",until:"16th Street"},
-   {action:"right",street:"16th Street",until:"Cuming Street"},
-   {action:"left",street:"Cuming Street and Northwest Radial Highway",until:"58th Street"},
-   {action:"left",street:"58th Street",until:"Maple Street"},
-   {action:"continue",street:"Maple Street",until:"102nd Street"},
-   {action:"left",street:"102nd Street",until:"Regency Parkway",note:"Merge with California Street"},
-   {action:"right",street:"Regency Parkway",until:"the south entrance of Regency Circle"},
-   {action:"right",street:"Regency Circle",until:"Regency Parkway",note:"Follow Regency Circle around"},
-   {action:"left",street:"Regency Parkway",until:"California Street"},
-   {action:"left",street:"California Street and 102nd Street",until:"Westroads Transit Center entrance"}]},
-  {id:"eastbound",label:"Eastbound",origin:"Westroads T.C.",destination:"14th Street layover",steps:[
-   {action:"continue",street:"Westroads Transit Center exit",until:"Nicholas Street"},
-   {action:"right",street:"Nicholas Street",until:"98th Street"},
-   {action:"right",street:"98th Street",until:"California Street"},
-   {action:"right",street:"California Street",until:"102nd Street"},
-   {action:"right",street:"102nd Street",until:"Maple Street"},
-   {action:"right",street:"Maple Street",until:"Northwest Radial Highway"},
-   {action:"right",street:"Northwest Radial Highway",until:"Cuming Street"},
-   {action:"left",street:"Cuming Street",until:"16th Street"},
-   {action:"right",street:"16th Street",until:"Capitol Avenue"},
-   {action:"left",street:"Capitol Avenue",until:"14th Street"},
-   {action:"right",street:"14th Street",until:"the layover"}]}
+  {id:"westbound",label:"Westbound",origin:"14th & Farnam",destination:"Westroads T.C.",steps:route4WestSteps},
+  {id:"eastbound",label:"Eastbound",origin:"Westroads T.C.",destination:"14th Street layover",steps:route4EastSteps}
   ]},
  {id:"14",number:"14",name:"108th / Fort Street",subtitle:"North Omaha T.C. ↔ Westroads Transit Center",directions:[
-  {id:"westbound",label:"Westbound",origin:"North Omaha T.C.",destination:"Westroads T.C.",steps:[
-   {action:"continue",street:"North Omaha Transit Center",until:"40th & Bedford"},
-   {action:"continue",street:"Bedford Avenue",until:"52nd Street"},
-   {action:"continue",street:"Northwest Radial Highway",until:"60th Street"},
-   {action:"continue",street:"Military Avenue",until:"72nd Street"},
-   {action:"continue",street:"Fort Street",until:"90th Street"},
-   {action:"continue",street:"Fort Street",until:"99th & Redick Walmart"},
-   {action:"continue",street:"108th Street",until:"Mill Valley Road"},
-   {action:"continue",street:"Davenport Street",until:"Westroads Transit Center"}]},
-  {id:"eastbound",label:"Eastbound",origin:"Westroads T.C.",destination:"North Omaha T.C.",steps:[
-   {action:"continue",street:"Westroads Transit Center",until:"114th & Davenport"},
-   {action:"continue",street:"Davenport Street",until:"108th & Mill Valley"},
-   {action:"continue",street:"108th Street",until:"Fort Street"},
-   {action:"continue",street:"Fort Street",until:"99th & Redick Walmart"},
-   {action:"continue",street:"Fort Street",until:"90th Street"},
-   {action:"continue",street:"Military Avenue",until:"72nd Street"},
-   {action:"continue",street:"Northwest Radial Highway",until:"52nd & Bedford"},
-   {action:"continue",street:"Bedford Avenue",until:"40th Street"},
-   {action:"continue",street:"North Omaha Transit Center",until:"layover"}]}
+  {id:"westbound",label:"Westbound",origin:"North Omaha T.C.",destination:"Westroads T.C.",steps:route14WestSteps},
+  {id:"eastbound",label:"Eastbound",origin:"Westroads T.C.",destination:"North Omaha T.C.",steps:route14EastSteps}
  ]},
  {id:"35",number:"35",name:"North 33rd Street",subtitle:"32nd & Vinton ↔ North Omaha Transit Center",directions:[
-  {id:"northbound",label:"Northbound",origin:"32nd & Vinton",destination:"North Omaha T.C.",steps:[
-   {action:"continue",street:"32nd Avenue",until:"Ed Creighton Avenue"},
-   {action:"continue",street:"Park Avenue",until:"Dodge Street"},
-   {action:"continue",street:"30th Street",until:"California Street"},
-   {action:"continue",street:"33rd Street",until:"Lake Street"},
-   {action:"continue",street:"Lake Street",until:"40th Street"},
-   {action:"continue",street:"40th Street",until:"Pratt Street"},
-   {action:"continue",street:"Paxton Boulevard",until:"North Omaha Transit Center"}]},
-  {id:"southbound",label:"Southbound",origin:"North Omaha T.C.",destination:"32nd & Vinton",steps:[
-   {action:"continue",street:"30th Street",until:"Sprague Street"},{action:"right",street:"Sprague Street",until:"J. Creighton Boulevard"},{action:"right",street:"J. Creighton Boulevard",until:"Paxton Boulevard"},{action:"right",street:"Paxton Boulevard",until:"38th Street",note:"Merge right onto Paxton."},{action:"left",street:"38th Street",until:"Pratt Street"},{action:"left",street:"Pratt Street",until:"40th Street"},{action:"right",street:"40th Street",until:"Lake Street"},{action:"left",street:"Lake Street",until:"33rd Avenue"},{action:"left",street:"33rd Avenue",until:"33rd Street"},{action:"right",street:"33rd Street",until:"California Street"},{action:"right",street:"California Street",until:"30th Street"},{action:"left",street:"30th Street / Turner Boulevard",until:"31st Street"},{action:"continue",street:"31st Street",until:"Leavenworth Street",note:"Stay left on 31st Street."},{action:"left",street:"Leavenworth Street",until:"Park Avenue"},{action:"right",street:"Park Avenue",until:"Ed Creighton Avenue"},{action:"right",street:"Ed Creighton Avenue",until:"32nd Avenue"},{action:"left",street:"32nd Avenue",until:"Vinton Street",note:"Start Route 36 interline."}]}
+  {id:"northbound",label:"Northbound",origin:"32nd & Vinton",destination:"North Omaha T.C.",steps:route35NorthSteps},
+  {id:"southbound",label:"Southbound",origin:"North Omaha T.C.",destination:"32nd & Vinton",steps:route35SouthSteps}
  ]},
  {id:"36",number:"36",name:"16th & Vinton Street",subtitle:"32nd & Vinton ↔ Downtown Omaha",directions:[
-  {id:"northbound",label:"Northbound",origin:"32nd & Vinton",destination:"16th & Capitol",steps:[
-   {action:"right",street:"32nd Avenue",until:"Ed Creighton Avenue"},{action:"right",street:"Ed Creighton Avenue",until:"Park Avenue"},{action:"left",street:"Park Avenue",until:"Dodge Street"},{action:"left",street:"Dodge Street",until:"30th Street"},{action:"right",street:"30th Street",until:"California Street"},{action:"left",street:"California Street",until:"33rd Street"},{action:"right",street:"33rd Street",until:"Lake Street"},{action:"left",street:"Lake Street",until:"40th Street"},{action:"right",street:"40th Street",until:"Pratt Street"},{action:"right",street:"Pratt Street",until:"North 38th Street"},{action:"left",street:"North 38th Street",until:"Paxton Boulevard"},{action:"right",street:"Paxton Boulevard",until:"North 31st Street",note:"Regular mid-day route: merge onto North 31st."},{action:"left",street:"North 31st Street",until:"North Omaha T.C."},{action:"right",street:"North Omaha T.C. entrance",until:"layover"}]},
-  {id:"southbound",label:"Southbound",origin:"16th & Capitol",destination:"32nd & Vinton",steps:[
-   {action:"continue",street:"Capitol Avenue",until:"17th Street"},{action:"left",street:"17th Street",until:"Douglas Street"},{action:"left",street:"Douglas Street",until:"16th Street"},{action:"right",street:"16th Street",until:"Vinton Street"},{action:"right",street:"Vinton Street",until:"32nd Avenue",note:"Start Route 35 interline."}]}
-  ]},
+  {id:"northbound",label:"Northbound",origin:"32nd & Vinton",destination:"16th & Capitol",steps:route36NorthSteps},
+  {id:"southbound",label:"Southbound",origin:"16th & Capitol",destination:"32nd & Vinton",steps:route36SouthSteps}
+ ]},
  {id:"26",number:"26",name:"North Omaha Circulator",subtitle:"Counterclockwise loop from North Omaha T.C.",directions:[
-  {id:"counterclockwise",label:"Counterclockwise",origin:"North Omaha T.C.",destination:"North Omaha T.C.",steps:[
-   {action:"continue",street:"North Omaha T.C.",until:"31st Avenue"},{action:"right",street:"31st Avenue",until:"Ames Avenue"},{action:"right",street:"Ames Avenue",until:"24th Street"},{action:"right",street:"24th Street",until:"Titus Avenue"},{action:"left",street:"Titus Avenue",until:"Minne Lusa Boulevard"},{action:"right",street:"Minne Lusa Boulevard",until:"Martin Avenue"},{action:"left",street:"Martin Avenue",until:"Redick Street"},{action:"right",street:"Redick Street",until:"42nd Street"},{action:"left",street:"42nd Street",until:"Curtis Avenue"},{action:"left",street:"Curtis Avenue",until:"Fontenelle Boulevard"},{action:"right",street:"Fontenelle Boulevard",until:"Sorensen Parkway"},{action:"left",street:"Sorensen Parkway",until:"30th Street"},{action:"right",street:"30th Street",until:"North Omaha T.C."}]},
-  {id:"clockwise",label:"Clockwise",origin:"North Omaha T.C.",destination:"North Omaha T.C.",steps:[
-   {action:"continue",street:"North Omaha T.C.",until:"31st Avenue"},{action:"right",street:"31st Avenue",until:"Ames Avenue"},{action:"right",street:"Ames Avenue",until:"30th Street"},{action:"left",street:"30th Street",until:"Sorensen Parkway"},{action:"left",street:"Sorensen Parkway",until:"Fontenelle Boulevard"},{action:"right",street:"Fontenelle Boulevard",until:"Redick Street"},{action:"left",street:"Redick Street",until:"42nd Street"},{action:"left",street:"42nd Street",until:"Curtis Avenue"},{action:"left",street:"Curtis Avenue",until:"Martin Avenue"},{action:"left",street:"Martin Avenue",until:"Minne Lusa Boulevard"},{action:"right",street:"Minne Lusa Boulevard",until:"Vane Street"},{action:"left",street:"Vane Street",until:"24th Street"},{action:"right",street:"24th Street",until:"Ames Avenue"},{action:"right",street:"Ames Avenue",until:"30th Street"},{action:"left",street:"30th Street",until:"North Omaha T.C."}]}
-  ]},
+  {id:"counterclockwise",label:"Counterclockwise",origin:"North Omaha T.C.",destination:"North Omaha T.C.",steps:route26CounterclockwiseSteps},
+  {id:"clockwise",label:"Clockwise",origin:"North Omaha T.C.",destination:"North Omaha T.C.",steps:route26ClockwiseSteps}
+ ]},
  {id:"15",number:"15",name:"Center Street",subtitle:"22nd & Cuming ↔ Oak View Mall",directions:[
-  {id:"westbound",label:"Westbound",origin:"22nd & Cuming",destination:"Oak View Mall",steps:[
-   {action:"continue",street:"Dodge Street",until:"16th Street"},{action:"left",street:"16th Street",until:"Farnam Street"},{action:"right",street:"Farnam Street",until:"42nd Street"},{action:"left",street:"42nd Street",until:"Center Street"},{action:"right",street:"Center Street",until:"67th Street"},{action:"right",street:"67th Street",until:"Mercy Road"},{action:"left",street:"Mercy Road",until:"layover"},{action:"continue",street:"Mercy Road",until:"78th Street"},{action:"left",street:"78th Street",until:"West Center Road"},{action:"right",street:"West Center Road",until:"Oakview Drive"},{action:"left",street:"Oakview Mall Drive",until:"143rd Place stop sign"},{action:"right",street:"143rd Street",until:"second mall entrance"},{action:"left",street:"second mall entrance",until:"Oak View layover",note:"Use Route 55 turn-by-turn when interlining with Route 55."}]},
-  {id:"eastbound",label:"Eastbound",origin:"Oak View Mall",destination:"22nd & Cuming",steps:[
-   {action:"continue",street:"Mall Drive",until:"stop sign"},{action:"left",street:"South 143rd Street",until:"Oakview Drive"},{action:"right",street:"Oakview Drive",until:"South 144th Street"},{action:"right",street:"South 144th Street",until:"Center Street"},{action:"right",street:"West Center Road",until:"78th Street"},{action:"left",street:"78th Street",until:"Mercy Road"},{action:"right",street:"Mercy Road",until:"Aksarben Transit Center"},{action:"continue",street:"Mercy Road",until:"67th Street"},{action:"right",street:"67th Street",until:"Center Street"},{action:"left",street:"Center Street",until:"42nd Street"},{action:"left",street:"42nd Street",until:"Farnam Street"},{action:"right",street:"Farnam Street",until:"Turner Boulevard"},{action:"right",street:"Turner Boulevard",until:"Harney Street"},{action:"left",street:"Harney Street",until:"13th Street"},{action:"left",street:"13th Street",until:"Dodge Street"},{action:"left",street:"Dodge Street",until:"layover"}]}
+  {id:"westbound",label:"Westbound",origin:"22nd & Cuming",destination:"Oak View Mall",steps:route15WestSteps},
+  {id:"eastbound",label:"Eastbound",origin:"Oak View Mall",destination:"22nd & Cuming",steps:route15EastSteps}
  ]},
  {id:"24",number:"24",name:"24th Street",subtitle:"North Omaha Transit Center ↔ MCC South Transit Center",directions:[
   {id:"northbound",label:"Northbound",origin:"MCC South Transit Center",destination:"North Omaha Transit Center",steps:route24NorthSteps},
   {id:"southbound",label:"Southbound",origin:"North Omaha Transit Center",destination:"MCC South Transit Center",steps:route24SouthSteps}
  ]},
  {id:"55",number:"55",name:"Q Street",subtitle:"22nd & Cuming ↔ 118th & Q",directions:[
-  {id:"westbound",label:"Westbound",origin:"22nd & Cuming",destination:"118th & Q",steps:[
-   {action:"continue",street:"Downtown and Center Street",until:"Aksarben Transit Center"},
-   {action:"continue",street:"Mercy Road",until:"84th Street"},
-   {action:"continue",street:"84th Street",until:"Q Street"},
-   {action:"continue",street:"Q Street",until:"96th Street"},
-   {action:"continue",street:"Q Street",until:"108th Street"},
-   {action:"continue",street:"Q Street",until:"118th Street"}]},
-  {id:"eastbound",label:"Eastbound",origin:"118th & Q",destination:"22nd & Cuming",steps:[
-   {action:"continue",street:"Q Street",until:"108th Street"},
-   {action:"continue",street:"Q Street",until:"96th Street"},
-   {action:"continue",street:"84th Street",until:"Center Street"},
-   {action:"continue",street:"Mercy Road",until:"Aksarben Transit Center"},
-   {action:"continue",street:"Center Street and downtown",until:"22nd & Cuming"}]}
+  {id:"westbound",label:"Westbound",origin:"22nd & Cuming",destination:"118th & Q",steps:route55WestSteps},
+  {id:"eastbound",label:"Eastbound",origin:"118th & Q",destination:"22nd & Cuming",steps:route55EastSteps}
   ]},
  {id:"95",number:"95",name:"Bellevue Express",subtitle:"Downtown ↔ Bellevue park-and-rides",directions:[
-  {id:"pm-express",label:"PM Express",origin:"22nd & Cuming",destination:"Downtown via Bellevue",steps:[
-   {action:"left",street:"Cuming Street",until:"16th Street"},
-   {action:"right",street:"16th Street",until:"Capitol Avenue"},
-   {action:"right",street:"Capitol Avenue",until:"17th Street"},
-   {action:"left",street:"17th Street",until:"Douglas Street"},
-   {action:"left",street:"Douglas Street",until:"14th Street"},
-   {action:"right",street:"14th Street",until:"Leavenworth Street"},
-   {action:"left",street:"Leavenworth Street",until:"13th Street"},
-   {action:"right",street:"13th Street / Fort Crook Road",until:"Childs Road"},
-   {action:"left",street:"Childs Road",until:"Park & Ride entrance"},
-   {action:"right",street:"Park & Ride entrance",until:"Park & Ride loop"},
-   {action:"left",street:"Childs Road",until:"Fort Crook Road"},
-   {action:"left",street:"Fort Crook Road",until:"Harvell Drive"},
-   {action:"left",street:"Harvell Drive",until:"Galvin Road"},
-   {action:"right",street:"Galvin Road",until:"Harlan Drive"},
-   {action:"right",street:"Harlan Drive",until:"Fort Crook Road"},
-   {action:"right",street:"Fort Crook Road",until:"Arboretum Drive"},
-   {action:"left",street:"Arboretum Drive",until:"Park & Ride and Harlan Drive / Highway 370"},
-   {action:"continue",street:"Northbound US-75",until:"Q Street exit"},
-   {action:"left",street:"Q Street",until:"27th Street"},
-   {action:"right",street:"27th Street",until:"MCC South layover entrance"},
-   {action:"left",street:"MCC South entrance",until:"MCC South layover"},
-   {action:"continue",street:"Babe Gomez Avenue",until:"30th Street"},
-   {action:"right",street:"Babe Gomez Avenue",until:"30th Street"},
-   {action:"left",street:"30th Street",until:"L Street"},
-   {action:"right",street:"L Street",until:"Northbound US-75 on-ramp",note:"Single trip: exit at Cuming, then turn right on Cuming to the garage. Double trip: continue via I-480 and Capitol to begin the second trip."}]},
-  {id:"am-express",label:"AM Express",origin:"Downtown Omaha",destination:"Downtown via Bellevue",steps:[
-   {action:"right",street:"Cuming Street",until:"I-480 on-ramp"},
-   {action:"left",street:"I-480",until:"South Kennedy Freeway / US-75"},
-   {action:"continue",street:"Southbound US-75",until:"Q Street exit"},
-   {action:"right",street:"Q Street",until:"27th Street"},
-   {action:"right",street:"27th Street",until:"MCC South entrance"},
-   {action:"left",street:"MCC South entrance",until:"MCC South layover"},
-   {action:"continue",street:"Babe Gomez Avenue",until:"27th Street"},
-   {action:"right",street:"Babe Gomez Avenue",until:"27th Street"},
-   {action:"right",street:"Q Street",until:"Southbound US-75 on-ramp"},
-   {action:"right",street:"Southbound US-75",until:"Cornhusker Road exit"},
-   {action:"left",street:"Cornhusker Road",until:"Fort Crook Road"},
-   {action:"continue",street:"Cornhusker Road / Harvell Drive",until:"Galvin Road"},
-   {action:"right",street:"Galvin Road",until:"Harlan Drive"},
-   {action:"right",street:"Harlan Drive",until:"Arboretum Drive Park & Ride"},
-   {action:"continue",street:"Arboretum Drive",until:"Fort Crook Road"},
-   {action:"left",street:"Fort Crook Road / 13th Street",until:"Dodge Street"},
-   {action:"left",street:"Dodge Street",until:"17th Street"},
-   {action:"right",street:"17th Street",until:"Cuming Street or Davenport Street",note:"Single trip: turn left on Cuming to the garage. Double trip: continue to Davenport, I-480, and repeat from the Q Street exit."}]}
+  {id:"pm-express",label:"PM Express",origin:"22nd & Cuming",destination:"Downtown via Bellevue",steps:route95PmSteps},
+  {id:"am-express",label:"AM Express",origin:"Downtown Omaha",destination:"Downtown via Bellevue",steps:route95AmSteps}
  ]},
 ];
 const routesByNumber=[...routes].sort((a,b)=>Number(a.number)-Number(b.number));
