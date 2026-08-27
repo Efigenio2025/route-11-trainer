@@ -13,9 +13,19 @@ type Dir={id:string;label:string;origin:string;destination:string;steps:Step[]};
 type Route={id:string;number:string;name:string;subtitle:string;directions:Dir[]};
 type LiveNavigation={instruction:string;modifier:string;index:number;total:number;provider:"Mapbox"|"operator"};
 // Route 3 training steps are derived from the official Metro stop sequence.
-// Live Assist uses the same official shape and asks Mapbox for turn-by-turn
-// maneuvers, so this route no longer depends on the operator direction sheet.
-const officialRoute3Steps=(stops:{name:string}[]):Step[]=>stops.slice(0,-1).map((stop,index)=>({action:"continue" as Turn,street:stop.name,until:stops[index+1].name}));
+// The bearing change between consecutive official stops supplies a simple,
+// data-driven straight/left/right label for each stop-to-stop segment. Live
+// Assist uses the same official shape and asks Mapbox for full maneuvers.
+const stopBearing=(a:[number,number],b:[number,number])=>{
+ const rad=Math.PI/180, y=Math.sin((b[0]-a[0])*rad)*Math.cos(b[1]*rad), x=Math.cos(a[1]*rad)*Math.sin(b[1]*rad)-Math.sin(a[1]*rad)*Math.cos(b[1]*rad)*Math.cos((b[0]-a[0])*rad);
+ return (Math.atan2(y,x)/rad+360)%360;
+};
+const turnAction=(delta:number):Turn=>delta>35&&delta<145?"right":delta<-35&&delta>-145?"left":"continue";
+const officialRoute3Steps=(stops:{name:string;coordinates:[number,number]}[]):Step[]=>stops.slice(0,-1).map((stop,index)=>{
+ const next=stops[index+1], before=stops[Math.max(0,index-1)];
+ const action=index===0?"continue":turnAction(((stopBearing(stop.coordinates,next.coordinates)-stopBearing(before.coordinates,stop.coordinates)+540)%360)-180);
+ return {action,street:stop.name,until:next.name};
+});
 const route3NorthSteps=officialRoute3Steps(ROUTE3_NORTH_STOPS);
 const route3SouthSteps=officialRoute3Steps(ROUTE3_SOUTH_STOPS);
 const routes:Route[]=[
