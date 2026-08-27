@@ -5,46 +5,23 @@ import "./mapbox.css";
 import "./routes.css";
 import "./avl.css";
 import "./live-assist";
+import {ROUTE3_NORTH_STOPS,ROUTE3_SOUTH_STOPS} from "./route3-official";
 
 type Turn="left"|"right"|"continue";
 type Step={action:Turn;street:string;until:string;note?:string};
 type Dir={id:string;label:string;origin:string;destination:string;steps:Step[]};
 type Route={id:string;number:string;name:string;subtitle:string;directions:Dir[]};
 type LiveNavigation={instruction:string;modifier:string;index:number;total:number;provider:"Mapbox"|"operator"};
+// Route 3 training steps are derived from the official Metro stop sequence.
+// Live Assist uses the same official shape and asks Mapbox for turn-by-turn
+// maneuvers, so this route no longer depends on the operator direction sheet.
+const officialRoute3Steps=(stops:{name:string}[]):Step[]=>stops.slice(0,-1).map((stop,index)=>({action:"continue" as Turn,street:stop.name,until:stops[index+1].name}));
+const route3NorthSteps=officialRoute3Steps(ROUTE3_NORTH_STOPS);
+const route3SouthSteps=officialRoute3Steps(ROUTE3_SOUTH_STOPS);
 const routes:Route[]=[
  {id:"3",number:"3",name:"North 40th / South 42nd",subtitle:"22nd & Cuming ↔ North Omaha / MCC South",directions:[
-  {id:"northbound",label:"Northbound",origin:"Metro South T.C.",destination:"North Omaha T.C.",steps:[
-   {action:"continue",street:"Metro South Transit Center exit",until:"Babe Gomez Avenue",note:"Official timing point: MCC South Transit Center."},
-   {action:"left",street:"Babe Gomez Avenue",until:"33rd Street"},
-   {action:"right",street:"33rd Street",until:"L Street"},
-   {action:"left",street:"L Street",until:"42nd Street"},
-   {action:"right",street:"42nd Street",until:"Harney Street"},
-   {action:"right",street:"Harney Street",until:"North 40th Street"},
-   {action:"left",street:"North 40th Street",until:"Hamilton Street",note:"Official timing points ahead: 42nd & Leavenworth, VA Medical Center, 42nd & Center, and 42nd & Grover."},
-   {action:"left",street:"Hamilton Street",until:"Military Avenue"},
-   {action:"right",street:"45th Street",until:"Bedford Avenue",note:"Merge right onto 45th Street."},
-   {action:"right",street:"Bedford Avenue",until:"42nd Street",note:"Official timing point: 45th & Bedford."},
-   {action:"left",street:"42nd Street",until:"Ames Avenue"},
-   {action:"right",street:"Ames Avenue",until:"30th Street",note:"Official timing point: 42nd & Ames."},
-   {action:"right",street:"30th Street",until:"North Omaha Transit Center",note:"Official timing point: North Omaha Transit Center."},
-   {action:"right",street:"North Omaha Transit Center entrance",until:"layover"}
-  ]},
-  {id:"southbound",label:"Southbound",origin:"North Omaha T.C.",destination:"MCC South T.C.",steps:[
-   {action:"continue",street:"North Omaha Transit Center exit",until:"Ames Avenue",note:"Official timing point: North Omaha Transit Center."},
-   {action:"right",street:"Ames Avenue",until:"42nd Street"},
-   {action:"left",street:"42nd Street",until:"Bedford Avenue"},
-   {action:"right",street:"Bedford Avenue",until:"45th Street",note:"Official timing point: 45th & Bedford."},
-   {action:"left",street:"45th Street",until:"Military Avenue"},
-   {action:"left",street:"Military Avenue",until:"Hamilton Street"},
-   {action:"right",street:"Hamilton Street",until:"North 40th Street"},
-   {action:"right",street:"North 40th Street",until:"Farnam Street",note:"Official timing points: 40th & Cuming and 40th & Dodge."},
-   {action:"left",street:"Farnam Street",until:"Saddle Creek Road"},
-   {action:"left",street:"Saddle Creek Road",until:"Leavenworth Street"},
-   {action:"left",street:"Leavenworth Street",until:"42nd Street"},
-   {action:"right",street:"South 42nd Street",until:"L Street",note:"Official timing points: 42nd & Leavenworth, VA Medical Center, 42nd & Center, and 42nd & Grover."},
-   {action:"right",street:"L Street",until:"Babe Gomez Avenue"},
-   {action:"right",street:"Babe Gomez Avenue",until:"MCC South Transit Center",note:"Official timing point: MCC South Transit Center."}
-  ]}
+  {id:"northbound",label:"Northbound",origin:"22nd & Cuming",destination:"North Omaha T.C.",steps:route3NorthSteps},
+  {id:"southbound",label:"Southbound",origin:"North Omaha T.C.",destination:"22nd & Cuming",steps:route3SouthSteps}
  ]},
  {id:"11",number:"11",name:"Leavenworth / Aksarben",subtitle:"11th Street ↔ Aksarben Transit Center",directions:[
   {id:"westbound",label:"Westbound",origin:"11th Street",destination:"Aksarben T.C.",steps:[
