@@ -229,7 +229,7 @@ type MapboxGuidancePlan = {
 // Keep the route constrained to the official transit shape while staying
 // within the Directions API's 25-coordinate limit. Sharp bends are retained;
 // long straight sections need no extra shaping points.
-function routeShapingPoints(route: [number, number][]) {
+function routeShapingPoints(route: [number, number][], stopAnchors: [number, number][] = []) {
   const lengths = routeLengths(route);
   const points: [number, number][] = [route[0]];
   let lastProgress = 0;
@@ -245,7 +245,16 @@ function routeShapingPoints(route: [number, number][]) {
     }
   }
   points.push(route[route.length - 1]);
-  return points.filter((point, index, all) => index === 0 || miles(point, all[index - 1]) > .002);
+  // Route 3 has a dense, official stop pattern. Keep those stop locations as
+  // shaping anchors so Mapbox cannot shortcut between long straight segments
+  // and the generated maneuvers stay tied to the actual bus alignment.
+  const anchors = stopAnchors
+    .map(coordinates => ({coordinates, progress:projectOnRoute(coordinates, route, lengths).along}))
+    .sort((a, b) => a.progress - b.progress)
+    .map(item => item.coordinates);
+  return [...points, ...anchors]
+    .sort((a, b) => projectOnRoute(a, route, lengths).along - projectOnRoute(b, route, lengths).along)
+    .filter((point, index, all) => index === 0 || miles(point, all[index - 1]) > .002);
 }
 
 function chunkShapingPoints(points: [number, number][]) {
@@ -266,6 +275,7 @@ async function fetchMapboxGuidance(
   direction: string,
   officialRoute: [number, number][],
   officialLengths: number[],
+  stopAnchors: [number, number][] = [],
 ): Promise<MapboxGuidancePlan> {
   const cacheKey = directionsCacheKey(routeNumber, direction);
   try {
@@ -273,7 +283,7 @@ async function fetchMapboxGuidance(
     if (cached?.savedAt > Date.now() - 7 * 86400000 && Array.isArray(cached?.plan?.steps)) return cached.plan;
   } catch { /* Ignore an unavailable or invalid browser cache. */ }
 
-  const chunks = chunkShapingPoints(routeShapingPoints(officialRoute));
+  const chunks = chunkShapingPoints(routeShapingPoints(officialRoute, routeNumber === "3" ? stopAnchors : []));
   const allSteps: MapboxGuidanceStep[] = [];
   const geometry: [number, number][] = [];
   for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
@@ -485,7 +495,7 @@ async function mountLiveMap(host: HTMLElement) {
     map.getCanvas().addEventListener("webglcontextlost", event => { event.preventDefault(); mapLoaded = false; showFallback(); });
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false, visualizePitch: false }), "bottom-right");
     map.dragPan.enable(); map.scrollZoom.enable(); map.touchZoomRotate.enable(); map.doubleClickZoom.enable();
-    const guidancePromise = fetchMapboxGuidance(routeNumber, host.dataset.direction || "", mapCoordinates, cumulativeRouteLengths)
+    const guidancePromise = fetchMapboxGuidance(routeNumber, host.dataset.direction || "", mapCoordinates, cumulativeRouteLengths, routeNumber === "3" ? route3Stops.map(stop => stop.coordinates) : [])
       .then(plan => {
         navigationPlan = plan;
         checkpoints = plan.steps.map(step => step.coordinates);
