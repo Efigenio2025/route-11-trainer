@@ -502,7 +502,7 @@ async function mountLiveMap(host: HTMLElement) {
     busMarkerElement.setAttribute("role", "img");
     busMarkerElement.setAttribute("aria-label", `Route ${routeNumber} bus location`);
     const busMarkerImage = document.createElement("img");
-    busMarkerImage.src = "/metro-bus-marker.png";
+    busMarkerImage.src = "/metro-bus-marker-rear.png";
     busMarkerImage.alt = "";
     busMarkerImage.draggable = false;
     busMarkerElement.appendChild(busMarkerImage);
