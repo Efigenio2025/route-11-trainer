@@ -363,11 +363,14 @@ async function mountLiveMap(host: HTMLElement) {
   const routeNumber = host.dataset.route || "11";
   const route30South = routeNumber === "30" && host.dataset.direction === "southbound";
   const route3South = routeNumber === "3" && host.dataset.direction === "southbound";
+  const route5South = routeNumber === "5" && host.dataset.direction === "southbound";
   const route11East = routeNumber === "11" && host.dataset.direction === "eastbound";
   const route4East = routeNumber === "4" && host.dataset.direction === "eastbound";
   const route30Turns = route30South ? ROUTE30_SOUTH_TURNS : ROUTE30_NORTH_TURNS;
   const route3Stops = route3South ? ROUTE3_SOUTH_STOPS : ROUTE3_NORTH_STOPS;
   const route3Shape = route3South ? ROUTE3_SOUTH_SHAPE : ROUTE3_NORTH_SHAPE;
+  const route5Stops = route5South ? ROUTE5_SOUTH_STOPS : ROUTE5_NORTH_STOPS;
+  const route5Shape = route5South ? ROUTE5_SOUTH_SHAPE : ROUTE5_NORTH_SHAPE;
   const route30Stops = route30South ? OFFICIAL_ROUTE30_SOUTH_STOPS : OFFICIAL_ROUTE30_NORTH_STOPS;
   const route30Shape = route30South ? ROUTE30_SOUTH_SHAPE : ROUTE30_NORTH_SHAPE;
   const route11Stops = route11East ? ROUTE11_EAST_STOPS : ROUTE11_WEST_STOPS;
@@ -396,7 +399,7 @@ async function mountLiveMap(host: HTMLElement) {
   const route26Clockwise = routeNumber === "26" && host.dataset.direction === "clockwise";
   const route26Shape = route26Clockwise ? [...ROUTE26_LOOP_SHAPE].reverse() : ROUTE26_LOOP_SHAPE;
   const route26Stops = route26Clockwise ? [...ROUTE26_LOOP_STOPS].reverse() : ROUTE26_LOOP_STOPS;
-  const mapCoordinates = routeNumber === "3" ? route3Shape : routeNumber === "30" ? route30Shape : routeNumber === "4" ? route4Shape : routeNumber === "14" ? route14Shape : routeNumber === "35" ? route35Shape : routeNumber === "36" ? route36Shape : routeNumber === "26" ? route26Shape : routeNumber === "15" ? route15Shape : routeNumber === "55" ? route55Shape : routeNumber === "95" ? route95Shape : route11Shape;
+  const mapCoordinates = routeNumber === "3" ? route3Shape : routeNumber === "5" ? route5Shape : routeNumber === "30" ? route30Shape : routeNumber === "4" ? route4Shape : routeNumber === "14" ? route14Shape : routeNumber === "35" ? route35Shape : routeNumber === "36" ? route36Shape : routeNumber === "26" ? route26Shape : routeNumber === "15" ? route15Shape : routeNumber === "55" ? route55Shape : routeNumber === "95" ? route95Shape : route11Shape;
   let checkpoints = routeNumber === "30"
     ? route30Turns.map(point => point.coordinates)
     : routeNumber === "95" ? (route95Am ? ROUTE95_AM_TURNS : ROUTE95_PM_TURNS)
@@ -406,6 +409,8 @@ async function mountLiveMap(host: HTMLElement) {
   let navigationPlan: MapboxGuidancePlan | null = null;
   const stops: MapPoint[] = routeNumber === "3"
     ? route3Stops
+    : routeNumber === "5"
+    ? route5Stops
     : routeNumber === "30"
     ? route30Stops
     : routeNumber === "4" ? route4Stops : routeNumber === "14" ? route14Stops : routeNumber === "35" ? route35Stops : routeNumber === "36" ? route36Stops : routeNumber === "26" ? route26Stops : routeNumber === "15" ? route15Stops : routeNumber === "55" ? route55Stops : routeNumber === "95" ? route95Stops : route11Stops;
@@ -998,6 +1003,12 @@ import {
   ROUTE3_SOUTH_SHAPE,
   ROUTE3_SOUTH_STOPS,
 } from "./route3-official";
+import {
+  ROUTE5_NORTH_SHAPE,
+  ROUTE5_NORTH_STOPS,
+  ROUTE5_SOUTH_SHAPE,
+  ROUTE5_SOUTH_STOPS,
+} from "./route5-official";
 import {
   ROUTE11_EAST_SHAPE,
   ROUTE11_EAST_STOPS,
