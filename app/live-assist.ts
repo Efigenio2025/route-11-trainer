@@ -364,6 +364,7 @@ async function mountLiveMap(host: HTMLElement) {
   const route30South = routeNumber === "30" && host.dataset.direction === "southbound";
   const route3South = routeNumber === "3" && host.dataset.direction === "southbound";
   const route5South = routeNumber === "5" && host.dataset.direction === "southbound";
+  const route8South = routeNumber === "8" && host.dataset.direction === "southbound";
   const route11East = routeNumber === "11" && host.dataset.direction === "eastbound";
   const route4East = routeNumber === "4" && host.dataset.direction === "eastbound";
   const route30Turns = route30South ? ROUTE30_SOUTH_TURNS : ROUTE30_NORTH_TURNS;
@@ -371,6 +372,8 @@ async function mountLiveMap(host: HTMLElement) {
   const route3Shape = route3South ? ROUTE3_SOUTH_SHAPE : ROUTE3_NORTH_SHAPE;
   const route5Stops = route5South ? ROUTE5_SOUTH_STOPS : ROUTE5_NORTH_STOPS;
   const route5Shape = route5South ? ROUTE5_SOUTH_SHAPE : ROUTE5_NORTH_SHAPE;
+  const route8Stops = route8South ? ROUTE8_SOUTH_STOPS : ROUTE8_NORTH_STOPS;
+  const route8Shape = route8South ? ROUTE8_SOUTH_SHAPE : ROUTE8_NORTH_SHAPE;
   const route30Stops = route30South ? OFFICIAL_ROUTE30_SOUTH_STOPS : OFFICIAL_ROUTE30_NORTH_STOPS;
   const route30Shape = route30South ? ROUTE30_SOUTH_SHAPE : ROUTE30_NORTH_SHAPE;
   const route11Stops = route11East ? ROUTE11_EAST_STOPS : ROUTE11_WEST_STOPS;
@@ -399,7 +402,7 @@ async function mountLiveMap(host: HTMLElement) {
   const route26Clockwise = routeNumber === "26" && host.dataset.direction === "clockwise";
   const route26Shape = route26Clockwise ? [...ROUTE26_LOOP_SHAPE].reverse() : ROUTE26_LOOP_SHAPE;
   const route26Stops = route26Clockwise ? [...ROUTE26_LOOP_STOPS].reverse() : ROUTE26_LOOP_STOPS;
-  const mapCoordinates = routeNumber === "3" ? route3Shape : routeNumber === "5" ? route5Shape : routeNumber === "30" ? route30Shape : routeNumber === "4" ? route4Shape : routeNumber === "14" ? route14Shape : routeNumber === "35" ? route35Shape : routeNumber === "36" ? route36Shape : routeNumber === "26" ? route26Shape : routeNumber === "15" ? route15Shape : routeNumber === "55" ? route55Shape : routeNumber === "95" ? route95Shape : route11Shape;
+  const mapCoordinates = routeNumber === "3" ? route3Shape : routeNumber === "5" ? route5Shape : routeNumber === "8" ? route8Shape : routeNumber === "30" ? route30Shape : routeNumber === "4" ? route4Shape : routeNumber === "14" ? route14Shape : routeNumber === "35" ? route35Shape : routeNumber === "36" ? route36Shape : routeNumber === "26" ? route26Shape : routeNumber === "15" ? route15Shape : routeNumber === "55" ? route55Shape : routeNumber === "95" ? route95Shape : route11Shape;
   let checkpoints = routeNumber === "30"
     ? route30Turns.map(point => point.coordinates)
     : routeNumber === "95" ? (route95Am ? ROUTE95_AM_TURNS : ROUTE95_PM_TURNS)
@@ -411,6 +414,8 @@ async function mountLiveMap(host: HTMLElement) {
     ? route3Stops
     : routeNumber === "5"
     ? route5Stops
+    : routeNumber === "8"
+    ? route8Stops
     : routeNumber === "30"
     ? route30Stops
     : routeNumber === "4" ? route4Stops : routeNumber === "14" ? route14Stops : routeNumber === "35" ? route35Stops : routeNumber === "36" ? route36Stops : routeNumber === "26" ? route26Stops : routeNumber === "15" ? route15Stops : routeNumber === "55" ? route55Stops : routeNumber === "95" ? route95Stops : route11Stops;
@@ -530,6 +535,12 @@ async function mountLiveMap(host: HTMLElement) {
     let perspective3d = true;
     let latestTravelHeading: number | null = null;
     let compassHeading: number | null = null;
+    // Phone magnetometers are noisy (especially when the handset is being
+    // held in a moving vehicle). Keep a circular low-pass value so a few
+    // degrees of hand movement do not make Track Up visibly twitch.
+    let smoothedCompassHeading: number | null = null;
+    let lastCompassMapUpdate = 0;
+    let lastGpsCourseAt = 0;
     let compassListening = false;
     let compassHandler: (event: Event) => void = () => {};
     let trackUpButton: HTMLButtonElement | null = null;
@@ -540,6 +551,12 @@ async function mountLiveMap(host: HTMLElement) {
     let renderedBusPosition: [number, number] = [...busPosition];
     let markerAnimationFrame: number | null = null;
     const normalizeHeading = (value: number) => (value % 360 + 360) % 360;
+    const smoothHeading = (previous: number | null, next: number, alpha = .14) => {
+      if (previous == null) return normalizeHeading(next);
+      const delta = ((next - previous + 540) % 360) - 180;
+      if (Math.abs(delta) < 2.5) return previous;
+      return normalizeHeading(previous + Math.max(-10, Math.min(10, delta * alpha)));
+    };
     const headingLabel = (value: number) => {
       const directions = ["North", "Northeast", "East", "Southeast", "South", "Southwest", "West", "Northwest"];
       return directions[Math.round(normalizeHeading(value) / 45) % directions.length];
@@ -547,7 +564,13 @@ async function mountLiveMap(host: HTMLElement) {
     const updateHeadingReadout = (value: number) => {
       const heading = document.querySelector<HTMLElement>(".avl-heading");
       if (heading) heading.textContent = `${headingLabel(value)} · ${Math.round(value)}°`;
-      if (trackUp && followBus && mapLoaded) map.setBearing(value);
+      if (trackUp && followBus && mapLoaded) {
+        const now = performance.now();
+        if (now - lastCompassMapUpdate >= 180) {
+          lastCompassMapUpdate = now;
+          map.easeTo({ bearing: value, duration: 180, essential: true });
+        }
+      }
     };
     const focusBusOnMap = (target: [number, number], zoom: number, duration: number) => {
       if (!followBus || !mapLoaded) return;
@@ -814,9 +837,15 @@ async function mountLiveMap(host: HTMLElement) {
           if (Number.isFinite(orientation.webkitCompassHeading)) heading = Number(orientation.webkitCompassHeading);
           else if (orientation.absolute && Number.isFinite(orientation.alpha)) heading = 360 - Number(orientation.alpha);
           if (heading == null || !Number.isFinite(heading)) return;
-          compassHeading = normalizeHeading(heading);
-          latestTravelHeading = compassHeading;
-          updateHeadingReadout(compassHeading);
+          compassHeading = smoothHeading(smoothedCompassHeading, heading);
+          smoothedCompassHeading = compassHeading;
+          // Compass is a fallback for facing direction. GPS course, when
+          // available, takes precedence below because it is steadier while
+          // the bus is moving.
+          if (performance.now() - lastGpsCourseAt > 1400) {
+            latestTravelHeading = compassHeading;
+            updateHeadingReadout(compassHeading);
+          }
         };
         window.addEventListener("deviceorientationabsolute", compassHandler as EventListener, { passive: true });
         window.addEventListener("deviceorientation", compassHandler as EventListener, { passive: true });
@@ -844,6 +873,7 @@ async function mountLiveMap(host: HTMLElement) {
           ? normalizeHeading(position.coords.heading)
           : lastPosition && moved > .004 ? bearing(lastPosition, rawCurrent) : compassHeading;
         if (movementHeading != null && (position.coords.heading != null || lastPosition && moved > .004)) {
+          if (position.coords.heading != null) lastGpsCourseAt = performance.now();
           latestTravelHeading = movementHeading;
           updateHeadingReadout(movementHeading);
         }
@@ -1009,6 +1039,12 @@ import {
   ROUTE5_SOUTH_SHAPE,
   ROUTE5_SOUTH_STOPS,
 } from "./route5-official";
+import {
+  ROUTE8_NORTH_SHAPE,
+  ROUTE8_NORTH_STOPS,
+  ROUTE8_SOUTH_SHAPE,
+  ROUTE8_SOUTH_STOPS,
+} from "./route8-official";
 import {
   ROUTE11_EAST_SHAPE,
   ROUTE11_EAST_STOPS,
