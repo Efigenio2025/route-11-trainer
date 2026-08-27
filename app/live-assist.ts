@@ -556,8 +556,8 @@ async function mountLiveMap(host: HTMLElement) {
       style: "mapbox://styles/mapbox/standard",
       config: { basemap: { lightPreset: "day", show3dObjects: true } },
       center: [-95.974, 41.251],
-      zoom: 11.7,
-      pitch: 52,
+      zoom: 12.1,
+      pitch: 60,
       bearing: 0,
       attributionControl: true,
       interactive: true,
@@ -783,7 +783,7 @@ async function mountLiveMap(host: HTMLElement) {
           perspective3d = !perspective3d;
           refreshPerspectiveButton();
           // Use a direct camera update so the selected view snaps into place.
-          map.jumpTo({ pitch: perspective3d ? 52 : 0 });
+          map.jumpTo({ pitch: perspective3d ? 60 : 0 });
         });
         refreshPerspectiveButton();
         container.appendChild(perspectiveButton);
@@ -894,7 +894,7 @@ async function mountLiveMap(host: HTMLElement) {
       host.dataset.mapReady = "true";
       host.dataset.mapFallback = "false";
       const bounds = mapCoordinates.reduce((b: any, p) => b.extend(p), new mapboxgl.LngLatBounds(mapCoordinates[0], mapCoordinates[0]));
-      map.fitBounds(bounds, { padding: 45, duration: 0 });
+      map.fitBounds(bounds, { padding: 30, duration: 0 });
       requestAnimationFrame(() => map.resize());
     });
     const startGps = async () => {
