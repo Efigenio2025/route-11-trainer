@@ -589,8 +589,11 @@ async function mountLiveMap(host: HTMLElement) {
       style: "mapbox://styles/mapbox/standard",
       config: { basemap: { lightPreset: "day", show3dObjects: true } },
       center: [-95.974, 41.251],
-      zoom: 13.0,
-      pitch: 60,
+      // Start close enough to read the nearby streets while keeping the bus
+      // and the next few stops in view. The steeper pitch gives the 3D view
+      // the same forward-looking feel as a navigation app.
+      zoom: 15.2,
+      pitch: 70,
       bearing: 0,
       attributionControl: true,
       interactive: true,
@@ -816,7 +819,7 @@ async function mountLiveMap(host: HTMLElement) {
           perspective3d = !perspective3d;
           refreshPerspectiveButton();
           // Use a direct camera update so the selected view snaps into place.
-          map.jumpTo({ pitch: perspective3d ? 60 : 0 });
+          map.jumpTo({ pitch: perspective3d ? 70 : 0 });
         });
         refreshPerspectiveButton();
         container.appendChild(perspectiveButton);
