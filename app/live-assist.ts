@@ -592,7 +592,7 @@ async function mountLiveMap(host: HTMLElement) {
       // Start close enough to read the nearby streets while keeping the bus
       // and the next few stops in view. The steeper pitch gives the 3D view
       // the same forward-looking feel as a navigation app.
-      zoom: 15.2,
+      zoom: 15.8,
       pitch: 70,
       bearing: 0,
       attributionControl: true,
