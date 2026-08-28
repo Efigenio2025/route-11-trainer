@@ -680,7 +680,9 @@ async function mountLiveMap(host: HTMLElement) {
         const now = performance.now();
         if (now - lastCompassMapUpdate >= 180) {
           lastCompassMapUpdate = now;
-          map.easeTo({ bearing: value, offset: cameraOffset, duration: 180, essential: true });
+          // Keep rotating around the already-offset camera center so heading
+          // updates do not repeatedly pan the map.
+          map.easeTo({ bearing: value, duration: 180, essential: true });
         }
       }
     };
