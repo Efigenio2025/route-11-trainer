@@ -680,14 +680,16 @@ async function mountLiveMap(host: HTMLElement) {
         const now = performance.now();
         if (now - lastCompassMapUpdate >= 180) {
           lastCompassMapUpdate = now;
-          map.easeTo({ bearing: value, duration: 180, essential: true });
+          map.easeTo({ bearing: value, offset: cameraOffset, duration: 180, essential: true });
         }
       }
     };
+    // Keep the bus in the lower half of the viewport so the road ahead stays visible.
+    const cameraOffset: [number, number] = [0, 120];
     const focusBusOnMap = (target: [number, number], zoom: number, duration: number) => {
       if (!followBus || !mapLoaded) return;
-      const options: { center: [number, number]; zoom: number; duration: number; easing?: (value: number) => number; bearing?: number } = {
-        center: target, zoom, duration,
+      const options: { center: [number, number]; zoom: number; duration: number; offset: [number, number]; easing?: (value: number) => number; bearing?: number } = {
+        center: target, zoom, offset: cameraOffset, duration,
       };
       if (trackUp && latestTravelHeading != null) options.bearing = latestTravelHeading;
       map.easeTo(options);
@@ -712,7 +714,7 @@ async function mountLiveMap(host: HTMLElement) {
           followBus = true;
           refreshTrackUpButton();
           const bearing = trackUp && latestTravelHeading != null ? latestTravelHeading : 0;
-          map.easeTo({ center: renderedBusPosition, zoom: Math.max(map.getZoom(), 14.5), bearing, duration: 450 });
+          map.easeTo({ center: renderedBusPosition, zoom: Math.max(map.getZoom(), 14.5), bearing, offset: cameraOffset, duration: 450 });
         });
         refreshTrackUpButton();
         container.appendChild(trackUpButton);
